@@ -1,0 +1,52 @@
+<%# A kind: the middle layer of its subjects' recipes. The medium decides which fields show (kind-switch). %>
+<%= form_with model: [ project, kind ], class: "form", data: { controller: "kind-switch" } do |f| %>
+  <%= render "shared/errors", record: kind %>
+  <%= render "shared/installed" %>
+  <div class="field-row">
+    <div class="field field--wide"><%= f.label :name %><%= f.text_field :name, required: true, placeholder: "Monster sprite, Location, Portrait, Theme music…" %></div>
+    <div class="field">
+      <%= f.label :medium %>
+      <%= f.select :medium, Kind::MEDIA.map { |m| [ m.humanize, m ] }, {}, data: { kind_switch_target: "select", action: "kind-switch#update" },
+                   disabled: kind.persisted? && kind.subjects.any? %>
+      <% if kind.persisted? && kind.subjects.any? %><p class="hint">Fixed once it has subjects.</p><% end %>
+    </div>
+  </div>
+  <div class="field">
+    <%= f.label :prompt, "Framing" %>
+    <%= f.text_area :prompt, rows: 2 %>
+    <%= tag.p class: "hint", data: { show_for: "image" }, hidden: !kind.image? do %>How this kind is framed, after the house style: “a single monster, full body, profile view, plain white background”.<% end %>
+    <%= tag.p class: "hint", data: { show_for: "audio" }, hidden: !kind.audio? do %>Tags after the project's sound: “battle theme, fast, drums, loopable”.<% end %>
+  </div>
+  <%= tag.fieldset class: "bare", data: { show_for: "image" }, hidden: !kind.image?, disabled: !kind.image? do %>
+    <div class="field">
+      <%= f.label :negative %>
+      <%= f.text_area :negative, rows: 1 %>
+    </div>
+    <p class="hint">Sizes are scaled into the model's trained range, keeping their shape.</p>
+    <div class="field-row">
+      <div class="field"><%= f.label :width %><%= f.number_field :width, min: Kind::SIZES.min, max: Kind::SIZES.max, step: 64 %></div>
+      <div class="field"><%= f.label :height %><%= f.number_field :height, min: Kind::SIZES.min, max: Kind::SIZES.max, step: 64 %></div>
+      <div class="field field--check">
+        <%= f.check_box :transparent %>
+        <%= f.label :transparent, "Remove the background" %>
+      </div>
+    </div>
+    <%= render "shared/model_field", name: "kind[model]", id: "kind_model", value: kind.model, inherited: project.model.presence || Comfy.config[:model] %>
+    <%= render "shared/loras", name: "kind[loras]", loras: kind.loras, above: ArtDirection.stack_loras(project.loras) %>
+  <% end %>
+  <%= tag.fieldset class: "bare", data: { show_for: "audio" }, hidden: !kind.audio?, disabled: !kind.audio? do %>
+    <div class="field-row">
+      <div class="field"><%= f.label :seconds, "Seconds" %><%= f.number_field :seconds, min: Kind::SECONDS.min, max: Kind::SECONDS.max %></div>
+    </div>
+    <%= render "shared/model_field", name: "kind[model]", id: "kind_audio_model", value: kind.model, inherited: Comfy::Music.default_model, audio: true %>
+  <% end %>
+  <div class="field">
+    <%= f.label :variant_presets, "Variants each new subject starts with" %>
+    <%= f.text_area :variant_presets, value: kind.variant_presets_text, rows: 4, placeholder: "happy: smiling happily\nsad: sad expression, downcast eyes" %>
+    <p class="hint">One a line: a name, a colon, and the words it adds after the subject.</p>
+  </div>
+  <div class="actions">
+    <%= f.submit kind.new_record? ? "Add the kind" : "Save", class: "button button--primary" %>
+    <%= link_to "Cancel", project_kinds_path(project), class: "button button--quiet" %>
+  </div>
+<% end %>

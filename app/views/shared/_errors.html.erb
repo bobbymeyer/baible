@@ -1,0 +1,6 @@
+<%# A record's errors, above its form. record: anything with errors. %>
+<% if record.errors.any? %>
+  <div class="form-errors" role="alert">
+    <ul><% record.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
+  </div>
+<% end %>

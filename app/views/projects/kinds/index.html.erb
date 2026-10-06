@@ -1,0 +1,50 @@
+<% content_for :title, "Kinds · #{@project.name}" %>
+<div class="crumbs"><%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %></div>
+<div class="page-header">
+  <h1>Kinds</h1>
+  <div class="actions">
+    <%= link_to "New image kind", new_project_kind_path(@project, medium: "image"), class: "button" %>
+    <%= link_to "New audio kind", new_project_kind_path(@project, medium: "audio"), class: "button button--quiet" %>
+  </div>
+</div>
+<p class="prose">
+  Every recipe is made in layers: <%= link_to "#{@project.name}'s house style", edit_project_path(@project) %>, then the framing for its
+  kind, then the subject's own words, then a variant's. Any image layer can name a model, and the lowest one that does wins.
+  LoRAs stack in layer order; a later layer that names the same LoRA changes its strength or switches it off.
+  The ComfyUI workflow is built for each image from the model's family and what ComfyUI has installed.
+</p>
+
+<section class="window">
+  <h2><%= @project.name %>: house style</h2>
+  <dl class="facts">
+    <dt>Style</dt><dd><%= @project.style.presence || tag.span("none", class: "muted") %></dd>
+    <dt>Negative</dt><dd><%= @project.negative.presence || tag.span("none", class: "muted") %></dd>
+    <dt>Model</dt><dd><code><%= @project.model.presence || Comfy.config[:model] %></code><%= tag.span(" (the default)", class: "muted") unless @project.model %></dd>
+    <dt>LoRAs</dt><dd><%= lora_stack(@project.loras) %></dd>
+    <dt>Sound</dt><dd><%= @project.sound.presence || tag.span("none", class: "muted") %></dd>
+  </dl>
+  <p><%= link_to "Edit the house style", edit_project_path(@project) %></p>
+</section>
+
+<% @kinds.each do |kind| %>
+  <section class="window" id="<%= dom_id(kind) %>">
+    <h2><span class="medium medium--<%= kind.medium %>" title="<%= kind.medium.humanize %>"></span><%= kind.name %></h2>
+    <dl class="facts">
+      <dt>Framing</dt><dd><%= kind.prompt.presence || tag.span("none", class: "muted") %></dd>
+      <% if kind.image? %>
+        <dt>Negative</dt><dd><%= kind.negative.presence || tag.span("none", class: "muted") %></dd>
+        <dt>Size</dt><dd><%= kind.width %> × <%= kind.height %><%= ", background removed" if kind.transparent %></dd>
+        <dt>Model</dt><dd><code><%= kind.model.presence || "inherited" %></code></dd>
+        <dt>LoRAs</dt><dd><%= lora_stack(kind.loras) %></dd>
+      <% else %>
+        <dt>Length</dt><dd><%= kind.seconds %> seconds</dd>
+        <dt>Model</dt><dd><code><%= kind.model.presence || Comfy::Music.default_model %></code></dd>
+      <% end %>
+      <% if kind.variant_presets.any? %>
+        <dt>Variants</dt><dd><%= kind.variant_presets.map { |row| row["name"] }.to_sentence %></dd>
+      <% end %>
+      <dt>Subjects</dt><dd><%= kind.subjects.size %></dd>
+    </dl>
+    <p><%= link_to "Edit #{kind.name}", edit_project_kind_path(@project, kind) %></p>
+  </section>
+<% end %>

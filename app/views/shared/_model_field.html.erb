@@ -1,0 +1,21 @@
+<%# One layer's model. name, id, value; inherited: what applies when this is blank; audio: an ACE-Step checkpoint
+    rather than an image model. A strict picker of what ComfyUI has, grouped by family; a text field while ComfyUI
+    isn't answering. %>
+<% caps = Comfy.capabilities %>
+<% audio = local_assigns.fetch(:audio, false) %>
+<div class="field">
+  <%= label_tag id, "Model" %>
+  <% if caps.reachable? && audio %>
+    <%= grouped_picker name, value, [ [ "Checkpoints", caps.checkpoints.sort_by(&:downcase) ] ], blank: "Inherit: #{inherited}", id: id %>
+  <% elsif caps.reachable? %>
+    <%= grouped_picker name, value, model_groups(caps), blank: "Inherit: #{inherited}", id: id %>
+  <% else %>
+    <%= text_field_tag name, value, id: id, placeholder: inherited %>
+  <% end %>
+  <% if audio %>
+    <p class="hint"><%= value.present? ? "An ACE-Step checkpoint." : "Blank uses #{inherited}." %></p>
+  <% else %>
+    <% family = Comfy::Family.for(value.presence || inherited, capabilities: caps) %>
+    <p class="hint"><%= value.present? ? "Runs as" : "Blank uses #{inherited}, run as" %> <%= family.summary %>.</p>
+  <% end %>
+</div>

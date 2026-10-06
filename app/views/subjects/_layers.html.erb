@@ -1,0 +1,17 @@
+<%# The layers a recipe is composed from, top to bottom. subject; variant: a detail layer, or nil. %>
+<ol class="layers">
+  <% subject.layers(local_assigns[:variant]).each do |layer| %>
+    <li>
+      <span class="label"><%= layer["role"] %></span>
+      <strong><%= layer["label"] %></strong>
+      <p><%= layer["prompt"].presence || tag.span("nothing yet", class: "muted") %></p>
+      <% if layer["model"].present? %>
+        <p class="layers__loras">Model: <code><%= layer["model"] %></code></p>
+      <% end %>
+      <% if layer["loras"].any? %>
+        <p class="layers__loras"><%= lora_stack(layer["loras"]) %></p>
+      <% end %>
+    </li>
+  <% end %>
+</ol>
+<p class="hint"><%= link_to "Edit the house style", edit_project_path(subject.project) %> · <%= link_to "Edit #{subject.kind.name}", edit_project_kind_path(subject.project, subject.kind) %></p>

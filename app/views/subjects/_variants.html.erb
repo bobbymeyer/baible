@@ -1,0 +1,24 @@
+<%# The subject's variants: a detail layer each, after the subject. %>
+<p class="hint">Each variant adds its words after <%= subject.name %>'s, and has its own candidates and pick (“happy”: “smiling happily”).</p>
+<table class="table variant-rows">
+  <thead><tr><th scope="col">Name</th><th scope="col">Adds</th><th scope="col"></th></tr></thead>
+  <tbody>
+    <% subject.variants.each do |variant| %>
+      <tr id="<%= dom_id(variant) %>">
+        <td colspan="2">
+          <%= form_with model: variant, url: subject_variant_path(subject, variant), method: :patch, class: "inline-form", id: dom_id(variant, :form) do |f| %>
+            <div class="field"><%= f.label :name, "Name", for: dom_id(variant, :name), class: "visually-hidden" %><%= f.text_field :name, id: dom_id(variant, :name) %></div>
+            <div class="field field--wide"><%= f.label :prompt, "Adds", for: dom_id(variant, :prompt), class: "visually-hidden" %><%= f.text_field :prompt, id: dom_id(variant, :prompt) %></div>
+            <%= f.submit "Save", class: "button button--quiet" %>
+          <% end %>
+        </td>
+        <td><%= button_to "Delete", subject_variant_path(subject, variant), method: :delete, class: "link-button", form: { data: { turbo_confirm: "Delete #{variant.name} and its pick?" } } %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+<%= form_with model: Variant.new, url: subject_variants_path(subject), class: "inline-form" do |f| %>
+  <div class="field"><%= f.label :name, "New variant" %><%= f.text_field :name, required: true, placeholder: "happy", id: "new_variant_name" %></div>
+  <div class="field field--wide"><%= f.label :prompt, "Adds" %><%= f.text_field :prompt, placeholder: "smiling happily", id: "new_variant_prompt" %></div>
+  <%= f.submit "Add the variant", class: "button" %>
+<% end %>

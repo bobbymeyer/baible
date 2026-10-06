@@ -1,0 +1,11 @@
+<% content_for :title, "#{@project.name}: house style" %>
+<div class="crumbs"><%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %></div>
+<h1>House style</h1>
+<p class="prose">The first layer of every recipe in <%= @project.name %>. Each kind's framing comes next, then the subject, then its variant.</p>
+<%= render "form", project: @project %>
+<section class="window">
+  <h2>Delete the project</h2>
+  <p class="hint">Its kinds, subjects, batches and picks go with it. Download what you want to keep first.</p>
+  <%= button_to "Delete #{@project.name}", project_path(@project), method: :delete, class: "button button--danger",
+                form: { data: { turbo_confirm: "Delete #{@project.name} and everything made in it?" } } %>
+</section>

@@ -1,0 +1,30 @@
+<% content_for :title, "#{@subject.name} · #{@project.name}" %>
+<%# Follows its batches as they land (Batch#refresh_watchers reloads the "batches" frame). %>
+<%= turbo_stream_from @subject, :studio %>
+<div class="crumbs">
+  <%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %> /
+  <%= link_to @subject.kind.name, project_path(@project, anchor: dom_id(@subject.kind)) %>
+</div>
+<div class="page-header">
+  <h1><%= @subject.name %></h1>
+  <div class="actions">
+    <%= link_to "Rename, move or delete", edit_subject_path(@subject), class: "button button--quiet" %>
+  </div>
+</div>
+
+<section class="window" id="picks">
+  <h2>Picks</h2>
+  <%= render "subjects/picks", subject: @subject %>
+</section>
+
+<section class="window" id="generate">
+  <h2>Generate</h2>
+  <%= render "subjects/generate", subject: @subject %>
+</section>
+
+<%= render "subjects/batches", subject: @subject %>
+
+<section class="window" id="variants">
+  <h2>Variants</h2>
+  <%= render "subjects/variants", subject: @subject %>
+</section>

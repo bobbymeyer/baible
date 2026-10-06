@@ -1,0 +1,18 @@
+<%# Each step of reaching ComfyUI and the language model (ConnectionCheck), on demand. %>
+<section class="window" id="connection">
+  <h2>Connection</h2>
+  <% if params[:check] %>
+    <p class="hint">In a container: <%= ConnectionCheck.in_container? ? "yes" : "no" %>.</p>
+    <% [ ConnectionCheck.comfy, ConnectionCheck.llm ].compact.each do |doctor| %>
+      <dl class="facts connection-steps">
+        <% doctor.steps.each do |step| %>
+          <dt><%= step.ok ? "✓" : "✗" %> <%= step.label %></dt><dd class="<%= 'error' unless step.ok %>"><%= step.detail %></dd>
+        <% end %>
+      </dl>
+    <% end %>
+    <p><%= link_to "Check again", settings_path(check: 1, anchor: "connection"), class: "button button--quiet" %></p>
+  <% else %>
+    <p class="hint">Each step of reaching ComfyUI and the language model, checked in turn, with what a failure usually means.</p>
+    <p><%= link_to "Check the connection", settings_path(check: 1, anchor: "connection"), class: "button button--quiet" %></p>
+  <% end %>
+</section>

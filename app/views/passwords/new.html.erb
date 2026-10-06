@@ -1,8 +1,12 @@
-<h1>Forgot your password?</h1>
-
-<%= tag.div(flash[:alert], style: "color:red") if flash[:alert] %>
-
-<%= form_with url: passwords_path do |form| %>
-  <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", placeholder: "Enter your email address", value: params[:email_address] %><br>
-  <%= form.submit "Email reset instructions" %>
-<% end %>
+<% content_for :title, "Forgot your password?" %>
+<div class="auth">
+  <h1>Forgot your password?</h1>
+  <p class="hint">This needs Action Mailer set up for the server. Without it, reset a password with <code>bin/rails users:create</code> (README).</p>
+  <%= form_with url: passwords_path, class: "form" do |form| %>
+    <div class="field">
+      <%= form.label :email_address, "Email" %>
+      <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address] %>
+    </div>
+    <div class="actions"><%= form.submit "Email reset instructions", class: "button" %></div>
+  <% end %>
+</div>

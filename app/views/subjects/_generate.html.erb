@@ -1,0 +1,117 @@
+<%# Generating: the layers, the subject's own layer (saved when the batch starts), and how the batch is made. The
+    target is the subject itself, one variant, or every variant at once ("Generate every variant"). An image batch can
+    start from any of the project's picks (a chain): the picture, or the head cut from a full-body one (Headshot),
+    re-noised; its first candidate takes that pick's seed. %>
+<% reachable = comfy_reachable? %>
+<% project = subject.project %>
+<% image = subject.image? %>
+<% disabled = { disabled: !reachable, title: ("ComfyUI isn't answering" unless reachable) } %>
+<%= render "shared/installed" %>
+<h3>The recipe, in layers</h3>
+<%= render "subjects/layers", subject: subject %>
+<% if subject.variants.any? %><p class="hint">A variant adds its words last (below).</p><% end %>
+
+<%= form_with url: subject_batches_path(subject), class: "form", id: "generate_form" do |f| %>
+  <div class="field">
+    <%= label_tag "subject_notes", "#{subject.name}: notes" %>
+    <%= text_area_tag "subject[notes]", subject.notes, rows: 2, id: "subject_notes",
+                      placeholder: image ? "green skin, a rusty knife, a patched cloak" : "sea shanty, accordion, slow, swaying" %>
+    <p class="hint"><%= image ? "After the name, in every prompt for #{subject.name} and its variants." : "Tags after the kind's, for every piece." %></p>
+  </div>
+  <% if image %>
+    <%= render "shared/model_field", name: "subject[model]", id: "subject_model", value: subject.model,
+                                     inherited: ArtDirection.pick_model(subject.kind.model, project.model, Comfy.config[:model]) %>
+    <%= render "shared/loras", name: "subject[loras]", loras: subject.loras, above: ArtDirection.stack_loras(project.loras, subject.kind.loras) %>
+  <% else %>
+    <div class="field">
+      <%= label_tag "subject_lyrics", "Lyrics (blank for instrumental)" %>
+      <%= text_area_tag "subject[lyrics]", subject.lyrics, rows: 4, id: "subject_lyrics", placeholder: "[verse]\nThe tide comes in…" %>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <%= label_tag "subject_seconds", "Seconds" %>
+        <%= number_field_tag "subject[seconds]", subject.seconds, min: Kind::SECONDS.min, max: Kind::SECONDS.max, id: "subject_seconds", placeholder: subject.kind.seconds %>
+      </div>
+    </div>
+    <%= render "shared/model_field", name: "subject[model]", id: "subject_model", value: subject.model,
+                                     inherited: subject.kind.model.presence || Comfy::Music.default_model, audio: true %>
+  <% end %>
+
+  <% if image %>
+    <% if Llm.enabled? %>
+      <div class="field field--check">
+        <%= hidden_field_tag :write, "0", id: nil %>
+        <%= check_box_tag :write, "1", true, id: "batch_write" %>
+        <%= label_tag "batch_write", "Let the language model write the subject in the way this model reads best" %>
+      </div>
+    <% end %>
+    <div class="field field--check">
+      <%= hidden_field_tag :draft, "0", id: nil %>
+      <%= check_box_tag :draft, "1", true, id: "batch_draft" %>
+      <%= label_tag "batch_draft", "Drafts first" %>
+    </div>
+    <p class="hint">Rough previews, about 512 × 512 in 16 steps; then “Make this one properly” renders the one you like at full quality, from the draft, so it stays the same picture. Not when starting from a pick.</p>
+    <div class="field field--check">
+      <%= hidden_field_tag :transparent, "0", id: nil %>
+      <%= check_box_tag :transparent, "1", subject.kind.transparent, id: "batch_transparent" %>
+      <%= label_tag "batch_transparent", "Remove the background" %>
+    </div>
+    <p class="hint">
+      In ComfyUI, with <code><%= Cutout.label %></code> (ComfyUI-RMBG's <code><%= Cutout.node %></code>); white inside the subject is kept. Each image is checked for real transparency.
+      <% if reachable && !Comfy.capabilities.node?(Cutout.node) %>
+        <strong>This ComfyUI has no <%= Cutout.node %> node yet:</strong> install ComfyUI-RMBG (by 1038lab, in the Manager), or untick this.
+      <% end %>
+    </p>
+
+    <% choices = chain_choices(project) %>
+    <fieldset class="panel">
+      <legend>Start from a pick (optional)</legend>
+      <% if choices.empty? %>
+        <p class="hint">Nothing picked in <%= project.name %> yet. Once something is, a batch can redraw it: a portrait from a sprite's head, an expression from the neutral face.</p>
+      <% else %>
+        <div class="field-row">
+          <div class="field field--wide">
+            <%= label_tag :from_pick_id, "Redraw" %>
+            <%= select_tag :from_pick_id, grouped_options_for_select(choices), include_blank: "Nothing: from the prompt alone" %>
+          </div>
+          <div class="field">
+            <%= label_tag :denoise, "Re-noise" %>
+            <%= number_field_tag :denoise, nil, min: 0.1, max: 1, step: 0.05, placeholder: Comfy.config.fetch(:chain, {})[:denoise].to_s %>
+          </div>
+          <div class="field field--check">
+            <%= check_box_tag :crop, "head", false %>
+            <%= label_tag :crop, "Only the head" %>
+          </div>
+        </div>
+        <p class="hint">
+          Lower keeps more of the picture. “Only the head” cuts it square from a full-body figure (a sprite to a portrait);
+          blank re-noise is <%= Comfy.config.fetch(:chain, {})[:head_denoise] %> for a head, <%= Comfy.config.fetch(:chain, {})[:denoise] %> otherwise.
+          The first candidate takes the pick's seed, so the face holds.
+        </p>
+      <% end %>
+    </fieldset>
+  <% end %>
+
+  <div class="inline-form">
+    <div class="field">
+      <%= label_tag :variant_id, "For" %>
+      <%= select_tag :variant_id, options_for_select(subject.variants.map { |v| [ "#{subject.name}, #{v.name}", v.id ] }), include_blank: subject.name %>
+    </div>
+    <div class="field">
+      <%= label_tag :count, "Candidates" %>
+      <%= number_field_tag :count, image ? Comfy.config[:candidates] : 1, min: 1, max: 8 %>
+    </div>
+    <%= submit_tag "Generate", class: "button generate", name: nil, **disabled %>
+    <% if subject.variants.any? %>
+      <%= button_tag "Generate every variant", type: "submit", class: "button button--quiet", name: "every", value: "1", **disabled %>
+    <% end %>
+  </div>
+  <% if subject.variants.any? %>
+    <p class="hint">A variant's first candidate takes the seed of <%= subject.name %>'s own pick, when there is one. Every variant queues one strip each.</p>
+  <% end %>
+<% end %>
+
+<details>
+  <summary>The composed recipe</summary>
+  <%= render "subjects/recipe", recipe: subject.recipe, preview: true %>
+</details>

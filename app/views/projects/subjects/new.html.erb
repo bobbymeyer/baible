@@ -1,0 +1,31 @@
+<% content_for :title, "New subject · #{@project.name}" %>
+<div class="crumbs"><%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %></div>
+<h1>New subject</h1>
+<% if @project.kinds.empty? %>
+  <p class="empty">A subject needs a kind. <%= link_to "Add a kind first", new_project_kind_path(@project) %>.</p>
+<% else %>
+  <%= form_with model: @subject, url: project_subjects_path(@project), class: "form" do |f| %>
+    <%= render "shared/errors", record: @subject %>
+    <div class="field-row">
+      <div class="field field--wide"><%= f.label :name %><%= f.text_field :name, required: true, autofocus: true, placeholder: "Goblin, Cid, the harbour town, the harbour's theme" %></div>
+      <div class="field">
+        <%= f.label :kind_id, "Kind" %>
+        <%= f.select :kind_id, @project.kinds.map { |kind| [ kind.label, kind.id ] } %>
+      </div>
+    </div>
+    <div class="field">
+      <%= f.label :notes, "Notes" %>
+      <%= f.text_area :notes, rows: 3, placeholder: "What it looks (or sounds) like: green skin, a rusty knife, a patched cloak" %>
+      <p class="hint">The subject's own layer, after the kind's framing. For an image, its name comes first; for audio, these are tags.</p>
+    </div>
+    <div class="field">
+      <%= f.label :lyrics, "Lyrics (audio only; blank for instrumental)" %>
+      <%= f.text_area :lyrics, rows: 3, placeholder: "[verse]\nThe tide comes in…" %>
+    </div>
+    <p class="hint">A new subject starts with its kind's variants (a portrait's expressions); change them in its studio.</p>
+    <div class="actions">
+      <%= f.submit "Add the subject", class: "button button--primary" %>
+      <%= link_to "Cancel", project_path(@project), class: "button button--quiet" %>
+    </div>
+  <% end %>
+<% end %>

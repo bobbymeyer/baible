@@ -1,0 +1,42 @@
+<%# A project's own layer: the top of every recipe in it. %>
+<%= form_with model: project, class: "form" do |f| %>
+  <%= render "shared/errors", record: project %>
+  <%= render "shared/installed" %>
+  <div class="field-row">
+    <div class="field"><%= f.label :name %><%= f.text_field :name, required: true, placeholder: "The Drowned Coast" %></div>
+    <div class="field field--wide"><%= f.label :description, "What it is (not used in prompts)" %><%= f.text_field :description, placeholder: "Polychrome's base world" %></div>
+  </div>
+  <fieldset class="panel">
+    <legend>Images: the house style</legend>
+    <div class="field">
+      <%= f.label :style, "Style" %>
+      <%= f.text_area :style, rows: 2, placeholder: "line art, hand drawn, monochrome" %>
+      <p class="hint">First in every image prompt, after the model's own quality words.</p>
+    </div>
+    <div class="field">
+      <%= f.label :negative %>
+      <%= f.text_area :negative, rows: 2, placeholder: "photo, 3d render, blurry, watermark" %>
+    </div>
+    <%= render "shared/model_field", name: "project[model]", id: "project_model", value: project.model, inherited: Comfy.config[:model] %>
+    <%= render "shared/loras", name: "project[loras]", loras: project.loras %>
+  </fieldset>
+  <fieldset class="panel">
+    <legend>Audio: the sound</legend>
+    <div class="field">
+      <%= f.label :sound, "Sound" %>
+      <%= f.text_area :sound, rows: 2, placeholder: "medieval folk, lute and fiddle, warm" %>
+      <p class="hint">First in every audio prompt (tags, for ACE-Step).</p>
+    </div>
+  </fieldset>
+  <% if project.new_record? %>
+    <div class="field field--check">
+      <%= hidden_field_tag :starter_kinds, "0", id: nil %>
+      <%= check_box_tag :starter_kinds, "1", true %>
+      <%= label_tag :starter_kinds, "Start with the usual kinds (#{Kind.starters.map { |k| k['name'] }.to_sentence})" %>
+    </div>
+  <% end %>
+  <div class="actions">
+    <%= f.submit project.new_record? ? "Start the project" : "Save", class: "button button--primary" %>
+    <%= link_to "Cancel", project.persisted? ? project_path(project) : projects_path, class: "button button--quiet" %>
+  </div>
+<% end %>

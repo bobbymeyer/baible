@@ -1,0 +1,29 @@
+# An optional language model that writes the subject of image prompts in the
+# way the image model reads best: booru tags for Anima or Pony, plain
+# sentences for Krea 2 (PromptWriter, README "The language model"). Without a URL nothing
+# is rewritten and prompts are composed as written.
+#
+# Any server with an OpenAI-compatible chat API works: llama.cpp's
+# llama-server, llama-swap, Ollama (http://host:11434/v1), LM Studio, vLLM,
+# or a hosted API. From inside a container, a server on the host is usually
+# http://host.docker.internal:<port>/v1.
+shared: &shared
+  # The API's base URL, up to and including /v1.
+  url: <%= ENV.fetch("LLM_URL", "") %>
+  # The model to ask for, as the server names it (llama-swap and Ollama
+  # route by it). Blank lets the server pick.
+  model: <%= ENV.fetch("LLM_MODEL", "").to_json %>
+  # Sent as "Authorization: Bearer ..." when set.
+  token: <%= ENV.fetch("LLM_TOKEN", "").to_json %>
+  # Any other headers, as a JSON object.
+  headers: <%= ENV.fetch("LLM_HEADERS", "{}").to_json %>
+  # Seconds to wait: a server may have to load the model first.
+  timeout: <%= ENV.fetch("LLM_TIMEOUT", "120") %>
+
+development:
+  <<: *shared
+test:
+  <<: *shared
+  url: ""
+production:
+  <<: *shared

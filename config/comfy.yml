@@ -1,0 +1,267 @@
+# ComfyUI, and how baible runs each family of model (docs/HANDOFF.md, README).
+#
+# ComfyUI can be anywhere the app can reach over HTTP: the same machine, a
+# box on the LAN or a tailnet, or behind a reverse proxy with auth. Nothing
+# here assumes a particular machine: the app asks ComfyUI what it has
+# installed (/object_info) and builds each workflow from that.
+#
+# Prompts, models and LoRAs are not set here: they are composed from the
+# project, the kind, the subject and its variant, and edited in the app.
+# The `kinds` at the end only seed a new project's kinds.
+shared: &shared
+  # Where ComfyUI answers. A path prefix works (https://host/comfy), and so
+  # does basic auth in the URL (https://user:pass@host). From inside a
+  # container, ComfyUI on the host is usually http://host.docker.internal:8188.
+  url: <%= ENV.fetch("COMFY_URL", "http://127.0.0.1:8188") %>
+  # Sent as "Authorization: Bearer ..." when set, for a proxy that wants one.
+  token: <%= ENV.fetch("COMFY_TOKEN", "").to_json %>
+  # Any other headers a proxy wants, as a JSON object, for example
+  # {"CF-Access-Client-Id": "...", "CF-Access-Client-Secret": "..."}.
+  headers: <%= ENV.fetch("COMFY_HEADERS", "{}").to_json %>
+  # The image model used when no project, kind or subject names one: a file
+  # name as ComfyUI lists it, from models/checkpoints or models/diffusion_models.
+  model: <%= ENV.fetch("COMFY_MODEL", "anima-preview.safetensors") %>
+  candidates: 4
+  # Drafts: rough, quick previews, about 512 × 512 (the same number of
+  # pixels, keeping the shape) in 16 steps; a family can set its own
+  # draft_steps, and one that takes fewer steps already keeps them.
+  # "Make this one properly" re-renders a chosen draft at full size,
+  # starting from the draft itself, re-noised by `denoise` (lower keeps more
+  # of the draft), so it stays the same picture.
+  draft:
+    pixels: 262144
+    steps: 16
+    denoise: 0.6
+  # Give up on a batch that hasn't finished after this many seconds.
+  timeout: 900
+  # Audio (Comfy::Music, an audio kind's subjects): ACE-Step, through
+  # ComfyUI's own nodes (ComfyUI 0.3.34 or later), from its checkpoint in
+  # models/checkpoints. A piece is described in tags ("medieval folk, lute,
+  # slow, melancholic") with lyrics or none, for so many seconds. A kind or
+  # subject can name another checkpoint; this is the default.
+  music:
+    model: <%= ENV.fetch("COMFY_MUSIC_MODEL", "ace_step_v1_3.5b.safetensors").to_json %>
+    steps: 50
+    cfg: 5.0
+    shift: 5.0
+    lyrics_strength: 0.99
+    mp3_quality: V0
+  # Starting a batch from a picked image (Batch "source", the chain): how
+  # much it is re-noised (lower keeps more of it). The first is offered when
+  # the head is cut from a full-body figure (Headshot), the second for a
+  # variant redrawn from the subject's own pick (an expression from the
+  # neutral face).
+  chain:
+    head_denoise: 0.55
+    denoise: 0.45
+  # Taking the background off (Cutout), for the kinds marked transparent
+  # and any batch asked to: in ComfyUI, with ComfyUI-RMBG's
+  # BiRefNet node (install "ComfyUI-RMBG" by 1038lab from the Manager). It
+  # fetches the model into models/RMBG the first time.
+  background_removal:
+    # BiRefNet_toonout: BiRefNet fine-tuned on anime characters (ToonOut,
+    # MIT). The node's others: BiRefNet-general, BiRefNet-HR (big pictures),
+    # Lucida (illustrations, glow and see-through things), BiRefNet_lite...
+    # The Settings page can name another.
+    model: <%= ENV.fetch("COMFY_RMBG_MODEL", "BiRefNet_toonout").to_json %>
+    # The colour a picture is rendered on when it will be cut out, in place
+    # of the kind's white background: a flat ground no character design is
+    # drawn in, so the white in a design (a shirt, a face, a sail) is never
+    # mistaken for the background. Blank keeps each kind's own framing
+    # (white), and only white closed in by the subject can be told from it.
+    ground: <%= ENV.fetch("COMFY_RMBG_GROUND", "green").to_json %>
+    # How far (0–255, per channel) a cleared pixel's colour may be from the
+    # ground's and still count as background. Cleared pixels further from
+    # it than this were taken out of the subject, and are put back.
+    tolerance: 56
+
+  # How each family of model wants to be run (Comfy::Family). A model's file
+  # name picks its family: the first family with a `match` found in the name
+  # (any case). A name nothing matches goes by where the file is: a checkpoint
+  # is taken for `checkpoint_family`, a bare diffusion model for
+  # `default_family`. Add a `match` here for a model with an unusual name.
+  #
+  # The workflow is built from these and from what ComfyUI has installed:
+  #   text_encoder, vae  file-name fragments to look for, when the model is a
+  #                      bare diffusion model with its encoder and VAE apart
+  #   clip_type          CLIPLoader types to try, first one ComfyUI offers wins
+  #   vae_override       a VAE to use instead of a checkpoint's own, if installed
+  #   lora               "model" (LoraLoaderModelOnly) or "model_and_clip"
+  #   clip_skip          2 for anime SDXL lineages
+  #   sampler, scheduler preferences, first one ComfyUI offers wins
+  #   negative           false for models that ignore it; it is also skipped
+  #                      (no encode at all) whenever cfg is 1
+  #   prefix             words that go first in every prompt (quality tags)
+  #   prompt_style       "tags" or "prose": how the language model, when
+  #                      there is one (config/llm.yml), writes the subject
+  #   pixels, multiple   the trained size range, in pixels; sizes are scaled
+  #                      into it, keeping their shape, rounded to `multiple`
+  #   draft_steps        steps for a quick draft (default: draft.steps below)
+  #   variants           overrides for names that also match these words
+  default_family: anima
+  checkpoint_family: sdxl
+  families:
+    anima:
+      label: Anima
+      match: [anima]
+      text_encoder: [qwen_3_06b, qwen3_06b, qwen3-0.6b, qwen_3_0.6b]
+      clip_type: [anima, stable_diffusion]
+      vae: [qwen_image_vae, wan_2.1_vae, wan2.1_vae]
+      lora: model
+      steps: 30
+      cfg: 4.5
+      sampler: [er_sde, euler_ancestral, euler]
+      scheduler: [simple, normal]
+      negative: true
+      prefix: "masterpiece, best quality"
+      negative_prefix: "worst quality, low quality, blurry, jpeg artifacts"
+      prompt_style: tags
+      pixels: [786432, 1310720]
+      multiple: 16
+    krea2:
+      label: Krea 2
+      match: [krea2, krea_2, krea-2]
+      text_encoder: [qwen3vl_4b, qwen3_vl_4b, qwen3-vl-4b]
+      clip_type: [krea2]
+      vae: [qwen_image_vae]
+      lora: model
+      steps: 52
+      cfg: 3.25
+      sampler: [euler]
+      scheduler: [simple]
+      negative: true
+      pixels: [1048576, 4194304]
+      multiple: 16
+      variants:
+        - match: [turbo]
+          label: Krea 2 Turbo
+          steps: 8
+          cfg: 1.0
+    sd15:
+      label: SD 1.5
+      match: [sd15, sd_15, v1-5, sd-1.5, sd1.5]
+      lora: model_and_clip
+      steps: 25
+      cfg: 7.0
+      sampler: [dpmpp_2m, euler_ancestral, euler]
+      scheduler: [karras, normal]
+      negative: true
+      pixels: [262144, 393216]
+      multiple: 64
+    sdxl:
+      label: SDXL
+      match: [sdxl, _xl, xl_, -xl, xl-, pony, illustrious, noob, juggernaut, realvis]
+      vae_override: [sdxl-vae-fp16-fix, sdxl_vae_fp16_fix]
+      lora: model_and_clip
+      steps: 25
+      cfg: 6.0
+      sampler: [dpmpp_2m, euler_ancestral, euler]
+      scheduler: [karras, normal]
+      negative: true
+      pixels: [786432, 1310720]
+      multiple: 64
+      variants:
+        - match: [pony]
+          label: Pony
+          prefix: "score_9, score_8_up, score_7_up"
+          negative_prefix: "score_4, score_5, score_6"
+          prompt_style: tags
+          clip_skip: 2
+        - match: [illustrious, noob]
+          label: Illustrious
+          prefix: "masterpiece, best quality"
+          negative_prefix: "worst quality, low quality"
+          prompt_style: tags
+          clip_skip: 2
+        - match: [lightning, turbo, lcm, hyper, dmd]
+          steps: 6
+          cfg: 1.5
+          sampler: [euler, euler_ancestral]
+          scheduler: [sgm_uniform, normal]
+
+  # The kinds a new project starts with (Kind.starters), each editable and
+  # removable afterwards. medium: image or audio. An image kind's framing
+  # comes after the project's style; "plain white background" is swapped
+  # for the cut-out ground when the background comes off (Cutout). An audio
+  # kind's framing comes after the project's sound. `variants` are the
+  # detail layers each new subject of the kind starts with (a portrait's
+  # expressions), each name with the words it adds.
+  kinds:
+    - name: Character sprite
+      medium: image
+      prompt: "a single figure, full body, standing, facing the viewer, centered, plain white background"
+      negative: "multiple people, cropped, text"
+      width: 832
+      height: 1216
+      transparent: true
+    - name: Portrait
+      medium: image
+      prompt: "a head and shoulders portrait, facing the viewer, centered, plain background"
+      negative: "multiple people, cropped head, text, hands"
+      width: 1024
+      height: 1024
+      transparent: false
+      variants:
+        happy: "smiling happily"
+        sad: "sad expression, downcast eyes"
+        angry: "angry expression, furrowed brow"
+        surprised: "surprised expression, wide eyes, open mouth"
+        worried: "worried expression, knitted brow"
+        determined: "determined expression, set jaw"
+    - name: Creature
+      medium: image
+      prompt: "a single monster, full body, standing, profile view facing left, centered, plain white background"
+      negative: "multiple creatures, cropped, text"
+      width: 1024
+      height: 1024
+      transparent: true
+    - name: Item
+      medium: image
+      prompt: "an item icon, a single object, centered, plain white background"
+      negative: "hands, people, cropped, text"
+      width: 1024
+      height: 1024
+      transparent: true
+    - name: Emblem
+      medium: image
+      prompt: "a spell or skill emblem, a single symbol, centered, plain white background"
+      negative: "people, cropped, text"
+      width: 1024
+      height: 1024
+      transparent: true
+    - name: Location
+      medium: image
+      prompt: "an establishing view of a place, no people"
+      negative: "text"
+      width: 1216
+      height: 832
+      transparent: false
+    - name: Scene
+      medium: image
+      prompt: "a wide painted backdrop for a story moment, cinematic, no people in the foreground"
+      negative: "text, speech bubbles, frames, borders"
+      width: 1280
+      height: 720
+      transparent: false
+    - name: Map
+      medium: image
+      prompt: "a painted fantasy map of a land seen from above, parchment and ink, coastlines, forests, mountains, no labels, no text, no compass rose"
+      negative: "text, letters, labels, grid, photo, people"
+      width: 1280
+      height: 720
+      transparent: false
+    - name: Music
+      medium: audio
+      prompt: "game soundtrack, loopable, instrumental"
+      seconds: 60
+
+development:
+  <<: *shared
+test:
+  <<: *shared
+  url: http://comfy.test
+  token: ""
+  headers: "{}"
+  model: anima-preview.safetensors
+production:
+  <<: *shared
