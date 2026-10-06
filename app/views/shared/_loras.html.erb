@@ -1,0 +1,30 @@
+<%# LoRA rows for one layer of a recipe. name: the param prefix; loras: [{ "name", "strength", "on" }];
+    above: the stack from the layers before this one, if any. %>
+<% id = name.parameterize(separator: "_") %>
+<% above = local_assigns.fetch(:above, []) %>
+<% caps = Comfy.capabilities %>
+<% groups = lora_groups(caps) if caps.reachable? %>
+<% if above.any? %>
+  <p class="hint">From the layers above: <%= lora_stack(above) %>. Name one here to change its strength or switch it off.</p>
+<% end %>
+<table class="grid-form lora-rows">
+  <thead><tr><th scope="col">LoRA</th><th scope="col">Strength</th><th scope="col">On</th></tr></thead>
+  <tbody>
+    <% rows_with_blanks(loras, blanks: 1).each_with_index do |lora, i| %>
+      <tr>
+        <td>
+          <% if groups %>
+            <%= grouped_picker "#{name}[#{i}][name]", lora["name"], groups, blank: "—", id: "#{id}_#{i}_name", "aria-label": "LoRA #{i + 1}" %>
+          <% else %>
+            <input type="text" name="<%= name %>[<%= i %>][name]" value="<%= lora['name'] %>" aria-label="LoRA <%= i + 1 %>" id="<%= id %>_<%= i %>_name">
+          <% end %>
+        </td>
+        <td><input type="number" name="<%= name %>[<%= i %>][strength]" value="<%= lora['strength'] %>" step="0.05" min="-5" max="5" placeholder="1.0" aria-label="LoRA <%= i + 1 %> strength" id="<%= id %>_<%= i %>_strength"></td>
+        <td>
+          <input type="hidden" name="<%= name %>[<%= i %>][on]" value="0">
+          <input type="checkbox" name="<%= name %>[<%= i %>][on]" value="1" <%= "checked" if lora.fetch("on", true) %> aria-label="LoRA <%= i + 1 %> on" id="<%= id %>_<%= i %>_on">
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

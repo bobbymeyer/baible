@@ -1,0 +1,46 @@
+<% content_for :title, @project.name %>
+<div class="crumbs"><%= link_to "Projects", projects_path %></div>
+<div class="page-header">
+  <h1><%= @project.name %></h1>
+  <div class="actions">
+    <%= link_to "House style", edit_project_path(@project), class: "button button--quiet" %>
+    <%= link_to "Kinds", project_kinds_path(@project), class: "button button--quiet" %>
+    <%= link_to "Download the manifest", project_manifest_path(@project), class: "button button--quiet" %>
+    <%= link_to "New subject", new_project_subject_path(@project), class: "button" %>
+  </div>
+</div>
+<% if @project.description || @project.style %>
+  <p class="prose"><%= @project.description %><% if @project.style %><span class="muted"> Style: <%= @project.style %></span><% end %></p>
+<% end %>
+
+<% if @kinds.empty? %>
+  <p class="empty">No kinds yet. <%= link_to "Add one", new_project_kind_path(@project) %> to frame the subjects.</p>
+<% end %>
+<% @kinds.each do |kind| %>
+  <section class="window" id="<%= dom_id(kind) %>">
+    <div class="page-header page-header--tight">
+      <h2><span class="medium medium--<%= kind.medium %>" title="<%= kind.medium.humanize %>"></span><%= kind.name %></h2>
+      <%= link_to "Add one", new_project_subject_path(@project, kind_id: kind.id), class: "button button--quiet" %>
+    </div>
+    <% if kind.subjects.empty? %>
+      <p class="empty">None yet.</p>
+    <% else %>
+      <ul class="subject-grid">
+        <% kind.subjects.sort_by { |s| s.name.downcase }.each do |subject| %>
+          <% pick = subject.pick_for(nil) %>
+          <li class="subject-tile">
+            <%= link_to subject_path(subject) do %>
+              <% if pick&.image? %>
+                <%= image_tag url_for(pick.file), alt: "", class: "thumb", loading: "lazy" %>
+              <% else %>
+                <span class="plate <%= 'plate--audio' if kind.audio? %>" aria-hidden="true"><%= subject.name.first unless kind.audio? %></span>
+              <% end %>
+              <strong><%= subject.name %></strong>
+              <small><%= pluralize(subject.picks.size, "pick") %><%= " of #{subject.variants.size + 1}" if subject.variants.any? %></small>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+<% end %>

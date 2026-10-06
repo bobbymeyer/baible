@@ -1,0 +1,4 @@
+<% content_for :title, "New kind · #{@project.name}" %>
+<div class="crumbs"><%= link_to @project.name, project_path(@project) %> / <%= link_to "Kinds", project_kinds_path(@project) %></div>
+<h1>New kind</h1>
+<%= render "form", project: @project, kind: @kind %>

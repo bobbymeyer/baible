@@ -1,29 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title><%= content_for(:title) || "Baible" %></title>
+    <title><%= [ content_for(:title), "baible" ].compact.join(" · ") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Baible">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="baible">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-
     <%= yield :head %>
-
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
-    <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
   <body>
-    <%= yield %>
+    <header class="topbar">
+      <%= link_to "baible", root_path, class: "topbar__brand" %>
+      <nav class="topbar__nav" aria-label="Project">
+        <% if @project&.persisted? && authenticated? %>
+          <%= link_to @project.name, project_path(@project), class: "topbar__project" %>
+          <%= link_to "Kinds", project_kinds_path(@project), class: ("is-current" if controller_path == "projects/kinds") %>
+          <%= link_to "Manifest", project_manifest_path(@project, inline: 1), title: "Every current pick, as JSON" %>
+        <% elsif authenticated? %>
+          <%= link_to "Projects", projects_path, class: ("is-current" if controller_name == "projects") %>
+        <% end %>
+      </nav>
+      <nav class="topbar__account" aria-label="Account">
+        <% if authenticated? %>
+          <%= link_to "Settings", settings_path, class: ("is-current" if controller_name == "settings") %>
+          <span class="muted"><%= Current.user.email_address %></span>
+          <%= button_to "Sign out", session_path, method: :delete, class: "link-button" %>
+        <% end %>
+      </nav>
+    </header>
+
+    <% if flash.any? %>
+      <div class="flashes">
+        <% flash.each do |type, message| %>
+          <% next unless message.is_a?(String) %>
+          <div class="flash <%= "flash--alert" if type.to_s == "alert" %>" role="<%= type.to_s == "alert" ? "alert" : "status" %>"
+               data-controller="flash" data-action="click->flash#dismiss"><%= message %></div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <main class="page">
+      <%= yield %>
+    </main>
   </body>
 </html>

@@ -1,0 +1,45 @@
+<%# One batch's candidates. The frame reloads as they land. %>
+<div class="batch" id="<%= dom_id(batch) %>">
+  <h3><%= batch.draft? ? "Drafts" : (batch.recipe["refines"] ? "Made properly" : "Candidates") %> for <%= batch.title %><%= ", #{batch.source_label}" if batch.source_label %></h3>
+  <% case batch.status %>
+  <% when "queued", "running" %>
+    <p class="batch__status" role="status">Generating: <%= batch.candidates.count(&:finished?) %> of <%= batch.candidates.size %> in.</p>
+  <% when "waiting" %>
+    <p class="batch__status" role="status">Waiting: <%= batch.error.to_s.start_with?("The language model") ? "the language model" : "ComfyUI" %> can't be reached right now, so this will carry on by itself when it's back. <span class="muted">(<%= batch.error %>)</span></p>
+  <% when "failed" %>
+    <p class="form-errors" role="alert"><%= batch.error %></p>
+  <% end %>
+  <ol class="candidate-strip">
+    <% batch.candidates.each do |candidate| %>
+      <li class="candidate is-<%= candidate.status %>" id="<%= dom_id(candidate) %>">
+        <figure>
+          <% if candidate.image? %>
+            <%= image_tag url_for(candidate.file), alt: "Candidate #{candidate.position + 1}, seed #{candidate.seed}" %>
+          <% elsif candidate.audio? %>
+            <audio controls preload="none" src="<%= url_for(candidate.file) %>"></audio>
+          <% else %>
+            <span class="candidate__empty"><%= candidate.status == "failed" ? "Failed" : "…" %></span>
+          <% end %>
+          <figcaption>Seed <%= candidate.seed %><%= tag.span(" · #{run_time(candidate.run_seconds)}", class: "muted", title: "Time ComfyUI spent on it") if candidate.run_seconds %><%= tag.span(" · background kept: #{candidate.error || "the background remover gave back an image with no transparency"}", class: "muted") if candidate.transparent == false || (candidate.error && candidate.status == "done") %><%= tag.span(" · #{candidate.error}", class: "muted") if candidate.error && candidate.status == "failed" && batch.status != "failed" %></figcaption>
+        </figure>
+        <% if candidate.file.attached? %>
+          <%# The whole page, since the new pick shows outside this frame too. %>
+          <% if batch.draft? %>
+            <%= button_to "Make this one properly", candidate_refinement_path(candidate), class: "button",
+                          form: { data: { turbo_frame: "_top" } } %>
+            <%= button_to "Use the draft", candidate_pick_path(candidate), class: "link-button",
+                          form: { data: { turbo_frame: "_top" } } %>
+          <% else %>
+            <%= button_to "Use this", candidate_pick_path(candidate), class: "button",
+                          form: { data: { turbo_frame: "_top" } } %>
+          <% end %>
+        <% end %>
+      </li>
+    <% end %>
+  </ol>
+  <details>
+    <summary>Its recipe</summary>
+    <%= render "subjects/recipe", recipe: batch.recipe %>
+  </details>
+  <%= button_to "Discard these", subject_batch_path(batch.subject, batch), method: :delete, class: "link-button", form: { data: { turbo_frame: "_top" } } %>
+</div>

@@ -1,0 +1,25 @@
+<% content_for :title, "#{@subject.name} · #{@project.name}" %>
+<div class="crumbs"><%= link_to @project.name, project_path(@project) %> / <%= link_to @subject.name, subject_path(@subject) %></div>
+<h1>Rename or move <%= @subject.name %></h1>
+<%= form_with model: @subject, class: "form" do |f| %>
+  <%= render "shared/errors", record: @subject %>
+  <div class="field-row">
+    <div class="field field--wide"><%= f.label :name %><%= f.text_field :name, required: true %></div>
+    <div class="field">
+      <%= f.label :kind_id, "Kind" %>
+      <%= f.select :kind_id, @project.kinds.select { |kind| kind.medium == @subject.medium }.map { |kind| [ kind.label, kind.id ] } %>
+      <p class="hint">Another <%= @subject.medium %> kind; its picks stay.</p>
+    </div>
+  </div>
+  <p class="hint">Notes, model and LoRAs are edited in the studio, where they're generated with.</p>
+  <div class="actions">
+    <%= f.submit "Save", class: "button button--primary" %>
+    <%= link_to "Cancel", subject_path(@subject), class: "button button--quiet" %>
+  </div>
+<% end %>
+<section class="window">
+  <h2>Delete <%= @subject.name %></h2>
+  <p class="hint">Its variants, batches and picks go with it.</p>
+  <%= button_to "Delete #{@subject.name}", subject_path(@subject), method: :delete, class: "button button--danger",
+                form: { data: { turbo_confirm: "Delete #{@subject.name} and its picks?" } } %>
+</section>

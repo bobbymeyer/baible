@@ -1,0 +1,19 @@
+<%# The subject's rounds of candidates, the newest first, each with the drafts it was made from. Its own frame, which
+    reloads as files land (Subjects::PanelsController). %>
+<% batches = subject.batches.includes(:variant, candidates: { file_attachment: :blob }).order(id: :desc).to_a %>
+<% drafts = batches.filter_map { |batch| batch.recipe.dig("refines", "batch_id") } %>
+<%= turbo_frame_tag "batches", data: { src: subject_panel_path(subject) } do %>
+  <section class="window" id="candidates">
+    <h2>Candidates</h2>
+    <% shown = batches.reject { |batch| drafts.include?(batch.id) } %>
+    <% if shown.empty? %>
+      <p class="empty">Nothing generated yet.</p>
+    <% end %>
+    <% shown.each do |batch| %>
+      <%= render "subjects/strip", batch: batch %>
+      <% if (from = batches.find { |b| b.id == batch.recipe.dig("refines", "batch_id") }) %>
+        <%= render "subjects/strip", batch: from %>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>

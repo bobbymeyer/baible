@@ -1,0 +1,115 @@
+<% content_for :title, "Settings" %>
+<h1>Settings</h1>
+<p class="prose">
+  Where baible finds ComfyUI (for images, audio and taking backgrounds off) and a language model (for writing prompts). Leave a field blank to use the server's
+  environment (<code>COMFY_URL</code>, <code>LLM_URL</code> and so on). Only addresses and names go here: if ComfyUI or the model needs a
+  token, a header or a password, set it in the environment, where it never reaches the database.
+</p>
+
+<%= form_with model: @setting, url: settings_path, method: :patch, class: "form" do |f| %>
+  <%= render "shared/errors", record: @setting %>
+  <% env = Rails.configuration.x.comfy %>
+  <fieldset class="panel">
+    <legend>ComfyUI</legend>
+    <div class="field">
+      <%= f.label :comfy_url, "Address" %>
+      <%= f.url_field :comfy_url, placeholder: env[:url] %>
+      <p class="hint">
+        Blank uses <code><%= env[:url].to_s.sub(%r{//[^@/]*@}, "//") %></code>.
+        From inside a container, ComfyUI on the same machine is usually <code>http://host.docker.internal:8188</code>.
+      </p>
+    </div>
+    <% caps = Comfy.capabilities %>
+    <div class="field">
+      <%= f.label :comfy_model, "Default model" %>
+      <% if caps.reachable? %>
+        <%= grouped_picker "site_setting[comfy_model]", @setting.comfy_model, model_groups(caps), blank: "From the environment: #{env[:model]}", id: "site_setting_comfy_model" %>
+      <% else %>
+        <%= f.text_field :comfy_model, placeholder: env[:model] %>
+      <% end %>
+      <p class="hint">The image model when no project, kind or subject names one.</p>
+    </div>
+    <div class="field">
+      <%= f.label :music_model, "Default audio model" %>
+      <% if caps.reachable? %>
+        <%= grouped_picker "site_setting[music_model]", @setting.music_model, [ [ "Checkpoints", caps.checkpoints.sort_by(&:downcase) ] ], blank: "From config/comfy.yml: #{env.dig(:music, :model)}", id: "site_setting_music_model" %>
+      <% else %>
+        <%= f.text_field :music_model, placeholder: env.dig(:music, :model) %>
+      <% end %>
+      <p class="hint">ACE-Step's checkpoint, in models/checkpoints, when no audio kind or subject names one.</p>
+    </div>
+  </fieldset>
+
+  <fieldset class="panel">
+    <legend>Background removal</legend>
+    <p class="hint">
+      In ComfyUI, for the kinds marked to lose their background: the picture is put through ComfyUI-RMBG's <code><%= Cutout.node %></code> node
+      (install "ComfyUI-RMBG" by 1038lab from ComfyUI's Manager), which fetches its model into <code>models/RMBG</code> the first time.
+      <% caps = Comfy.capabilities %>
+      <% if caps.reachable? %>
+        <%= caps.node?(Cutout.node) ? "This ComfyUI has it." : "This ComfyUI doesn't have it yet, so batches that remove the background stop and say so." %>
+      <% end %>
+    </p>
+    <div class="field">
+      <%= f.label :rmbg_model, "Model" %>
+      <%= f.text_field :rmbg_model, placeholder: Comfy.config.dig(:background_removal, :model).presence || Cutout.model, list: "rmbg_models" %>
+      <datalist id="rmbg_models">
+        <% (caps.reachable? ? caps.options(Cutout.node, "model") : []).each do |name| %><option value="<%= name %>"></option><% end %>
+      </datalist>
+      <p class="hint"><code>BiRefNet_toonout</code> (the default: BiRefNet fine-tuned on anime characters), <code>BiRefNet-general</code>, <code>BiRefNet-HR</code> (big pictures), <code>Lucida</code> (illustrations, glow and see-through things)…</p>
+    </div>
+    <p class="hint">
+      Pictures to be cut out are rendered on a
+      <%= Cutout.ground ? "#{Cutout.ground} ground (COMFY_RMBG_GROUND)" : "white ground (COMFY_RMBG_GROUND is blank)" %> and mended afterwards, so the white in a design is kept.
+    </p>
+  </fieldset>
+
+  <% draft = env.fetch(:draft, {}).to_h.symbolize_keys %>
+  <fieldset class="panel">
+    <legend>Drafts</legend>
+    <p class="hint">
+      Drafts are rough previews; “Make this one properly” renders the one you like at full size, starting from the draft.
+      Smaller and fewer steps is faster; blank uses <code>config/comfy.yml</code>.
+    </p>
+    <div class="field-row">
+      <div class="field">
+        <%= f.label :draft_size, "Size (pixels a side)" %>
+        <%= f.number_field :draft_size, min: 256, max: 1024, step: 64, placeholder: Math.sqrt(draft.fetch(:pixels, 262_144)).round %>
+        <p class="hint">The same number of pixels as a square this wide, in the kind's shape.</p>
+      </div>
+      <div class="field">
+        <%= f.label :draft_steps, "Steps" %>
+        <%= f.number_field :draft_steps, min: 1, max: 60, placeholder: draft.fetch(:steps, 16) %>
+        <p class="hint">A model that already takes fewer keeps its own.</p>
+      </div>
+      <div class="field">
+        <%= f.label :draft_denoise, "How much “properly” changes it" %>
+        <%= f.number_field :draft_denoise, min: 0.1, max: 1, step: 0.05, placeholder: draft.fetch(:denoise, 0.6).to_s %>
+        <p class="hint">Lower keeps closer to the draft; higher adds more detail and drifts more.</p>
+      </div>
+      <div class="field">
+        <%= f.label :candidates, "Candidates per batch" %>
+        <%= f.number_field :candidates, min: 1, max: 8, placeholder: env[:candidates] %>
+        <p class="hint">The starting number on each generate form.</p>
+      </div>
+    </div>
+  </fieldset>
+
+  <% llm_env = Rails.configuration.x.llm %>
+  <fieldset class="panel">
+    <legend>Language model</legend>
+    <div class="field">
+      <%= f.label :llm_url, "Address" %>
+      <%= f.url_field :llm_url, placeholder: llm_env[:url].presence || "http://host.docker.internal:8090/v1" %>
+      <p class="hint">An OpenAI-compatible API, up to and including <code>/v1</code>: llama.cpp, llama-swap, Ollama, LM Studio, vLLM or a hosted one. Blank everywhere turns the language model off.</p>
+    </div>
+    <div class="field">
+      <%= f.label :llm_model, "Model" %>
+      <%= f.text_field :llm_model, placeholder: llm_env[:model].presence || "as the server names it" %>
+    </div>
+  </fieldset>
+
+  <div class="actions"><%= f.submit "Save and check", class: "button button--primary" %></div>
+<% end %>
+
+<%= render "settings/connection" %>

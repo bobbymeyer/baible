@@ -1,0 +1,22 @@
+<% content_for :title, "Projects" %>
+<div class="page-header">
+  <h1>Projects</h1>
+  <div class="actions"><%= link_to "New project", new_project_path, class: "button" %></div>
+</div>
+<p class="prose">
+  A project is a world or a setting. Its house style is the first layer of every image and sound made in it;
+  its kinds frame each kind of asset; its subjects are the things themselves.
+</p>
+<% if @projects.any? %>
+  <div class="cards">
+    <% @projects.each do |project| %>
+      <article class="card">
+        <h2><%= link_to project.name, project_path(project) %></h2>
+        <p class="muted"><%= project.description.presence || project.style.presence || "No house style yet." %></p>
+        <p class="hint"><%= pluralize(project.kinds.size, "kind") %> · <%= pluralize(project.subjects.count, "subject") %> · <%= pluralize(project.picks.count, "pick") %></p>
+      </article>
+    <% end %>
+  </div>
+<% else %>
+  <p class="empty">No projects yet. <%= link_to "Start the first", new_project_path %>.</p>
+<% end %>

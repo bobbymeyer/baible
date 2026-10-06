@@ -1,0 +1,36 @@
+<%# One recipe, as ComfyUI will get it (apart from the seed). preview: also build the workflow against what ComfyUI
+    has installed now, to show its nodes or what's missing. %>
+<% audio = recipe["medium"] == "audio" %>
+<% model = recipe["model"] || recipe["checkpoint"] %>
+<% family = Comfy::Family.find(recipe["family"], model) unless audio %>
+<dl class="facts">
+  <dt><%= audio ? "Tags" : "Prompt" %></dt><dd><%= recipe["positive"] %></dd>
+  <% if recipe.dig("parts", "written") %>
+    <dt>Subject</dt><dd>written by the language model from “<%= recipe.dig("parts", "subject") %>”</dd>
+  <% elsif recipe["writer_error"] %>
+    <dt>Subject</dt><dd>as written: the language model couldn't help (<%= recipe["writer_error"] %>)</dd>
+  <% end %>
+  <% if audio %>
+    <dt>Lyrics</dt><dd><%= recipe["lyrics"].presence ? simple_format(recipe["lyrics"]) : "none: instrumental" %></dd>
+    <dt>Length</dt><dd><%= recipe["seconds"] %> seconds</dd>
+    <dt>Model</dt><dd><code><%= model %></code> · ACE-Step</dd>
+  <% else %>
+    <dt>Negative</dt><dd><%= recipe["negative"].presence || (family && !family.negative? ? "none: this model doesn't use one" : "—") %></dd>
+    <dt>LoRAs</dt><dd><%= lora_stack(Array(recipe["loras"])) %></dd>
+    <dt>Model</dt><dd><code><%= model %></code><%= " · #{family.summary}" if family %></dd>
+    <dt>Size</dt><dd><%= recipe["width"] %> × <%= recipe["height"] %><% if recipe["transparent"] %><%= ", background removed with #{recipe['cutout'] || 'ComfyUI'}" %><% end %></dd>
+    <% if recipe["source"] %>
+      <dt>Started from</dt><dd><%= recipe.dig("source", "crop") == "head" ? "the head of " : "" %><%= recipe.dig("source", "label") %>, re-noised <%= recipe["denoise"] %></dd>
+    <% end %>
+  <% end %>
+  <% if recipe["workflow"] %>
+    <dt>Workflow</dt><dd><%= recipe["workflow"] %></dd>
+  <% elsif local_assigns[:preview] && comfy_reachable? %>
+    <% begin %>
+      <% graph = audio ? Comfy::Music.build(recipe, seed: 0, prefix: "preview", capabilities: Comfy.capabilities) : Comfy::Workflow.build(recipe, seed: 0, prefix: "preview", capabilities: Comfy.capabilities) %>
+      <dt>Workflow</dt><dd><%= Comfy::Workflow.outline(graph) %></dd>
+    <% rescue Comfy::Error => e %>
+      <dt>Workflow</dt><dd class="error">Can't be built on this ComfyUI: <%= e.message %></dd>
+    <% end %>
+  <% end %>
+</dl>
