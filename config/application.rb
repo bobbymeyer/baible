@@ -38,5 +38,12 @@ module Baible
 
     # Don't generate system test files.
     config.generators.system_tests = nil
+
+    # ComfyUI and how each family of model runs, plus the starter kinds
+    # (config/comfy.yml); an optional language model for writing prompts
+    # (config/llm.yml). The Settings page (SiteSetting) overrides addresses
+    # and default models.
+    config.x.comfy = config_for(:comfy)
+    config.x.llm = config_for(:llm)
   end
 end
