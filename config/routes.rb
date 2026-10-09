@@ -19,8 +19,12 @@ Rails.application.routes.draw do
   end
 
   # An entry's page in the bible (show): its lore, its look and every
-  # subject made of it; and editing it.
-  resources :entries, only: %i[show edit update destroy]
+  # subject made of it; editing it; and the notes on it.
+  resources :entries, only: %i[show edit update destroy] do
+    scope module: :entries do
+      resources :notes, only: %i[create destroy]
+    end
+  end
 
   # A subject's studio (show), its own layer (edit), its variants, and the
   # batches that make candidates for it; the panel is the batches alone, for

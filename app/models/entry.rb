@@ -5,10 +5,12 @@
 # subject of a different kind; the harbour town, as a location and a map.
 # Its look (and LoRAs) is a layer of every image of it, between the kind's
 # framing and the subject, kept word for word so it reads the same in every
-# prompt. Its lore is the bible's text and never goes in a prompt.
+# prompt. Its lore is the bible's text, and its notes the running talk about
+# it (Note); neither ever goes in a prompt.
 class Entry < ApplicationRecord
   belongs_to :project
   has_many :subjects, dependent: :nullify
+  has_many :notes, -> { order(created_at: :desc, id: :desc) }, dependent: :destroy, inverse_of: :entry
 
   normalizes :name, :look, :lore, with: ->(value) { value.to_s.strip.presence }
 

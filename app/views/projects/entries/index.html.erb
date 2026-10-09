@@ -22,7 +22,7 @@
             <span class="plate" aria-hidden="true"><%= entry.name.first %></span>
           <% end %>
           <strong><%= entry.name %></strong>
-          <small><%= entry.subjects.map(&:kind).uniq.map(&:name).join(" · ").presence || "Not made yet" %></small>
+          <small><%= entry.subjects.map(&:kind).uniq.map(&:name).join(" · ").presence || "Not made yet" %><%= " · #{pluralize(entry.notes.size, 'note')}" if entry.notes.any? %></small>
         <% end %>
       </li>
     <% end %>

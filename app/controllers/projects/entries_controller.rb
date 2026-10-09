@@ -6,7 +6,7 @@ class Projects::EntriesController < ApplicationController
   include ProjectScoped
 
   def index
-    @entries = @project.entries.includes(subjects: [ :kind, { picks: { file_attachment: :blob } } ])
+    @entries = @project.entries.includes(:notes, subjects: [ :kind, { picks: { file_attachment: :blob } } ])
   end
 
   def new

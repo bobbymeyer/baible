@@ -84,7 +84,8 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
    LoRAs per kind of image; tags, length and checkpoint per kind of audio; and the variants each new
    subject starts with (a Portrait's expressions).
 3. **The bible** (optional): add an **entry** for each thing in the world that's made in more than
-   one kind, like Cid or the harbour town. Its **lore** is for people and never goes in a prompt. Its **look**
+   one kind, like Cid or the harbour town. Its **lore** and **notes** (a signed log: questions,
+   decisions, notes for whoever draws it next) are for people and never go in a prompt. Its **look**
    (and LoRAs) is the same words in every image of it, after the kind's framing. From its page,
    "Make Cid as…" adds a subject of any kind, of that entry; the page then shows every pick of it.
    The **Model sheet** kind makes a character's reference views (front, both three-quarters, full

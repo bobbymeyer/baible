@@ -67,6 +67,41 @@ RSpec.describe "The bible: entries", type: :request do
     expect(sprite.recipe["parts"]["entry"]).to eq("")
   end
 
+  it "keeps notes on an entry, signed and newest first, that only their author takes back" do
+    cid = project.entries.create!(name: "Cid", look: "eyepatch")
+    sprite = make_subject(project, "Character sprite", "Cid", entry: cid)
+
+    post entry_notes_path(cid), params: { note: { body: "Which eye? Legal says left, the comic has right." } }
+    expect(response).to redirect_to(entry_path(cid, anchor: "notes"))
+    post entry_notes_path(cid), params: { note: { body: "Left. Decided." } }
+    post entry_notes_path(cid), params: { note: { body: "  " } }
+    expect(flash[:alert]).to include("Body can't be blank")
+
+    expect(cid.notes.map(&:body)).to eq([ "Left. Decided.", "Which eye? Legal says left, the comic has right." ])
+    expect(cid.notes.map(&:user)).to all(eq(@user))
+    expect(sprite.recipe["positive"]).not_to include("Decided") # notes never go in a prompt
+
+    get entry_path(cid)
+    expect(page.css("#notes .note").map { |li| li.at(".prose").text.strip }).to eq([ "Left. Decided.", "Which eye? Legal says left, the comic has right." ])
+    expect(page.at("#notes").text).to include(@user.email_address)
+    get project_entries_path(project)
+    expect(response.body).to include("2 notes")
+
+    mine = cid.notes.first
+    theirs = cid.notes.create!(body: "Someone else's", user: make_user)
+    get entry_path(cid)
+    expect(page.at("##{ActionView::RecordIdentifier.dom_id(theirs)}").text).not_to include("Take back")
+
+    delete entry_note_path(cid, theirs)
+    expect(response).to have_http_status(:not_found)
+    delete entry_note_path(cid, mine)
+    expect(cid.notes.reload.map(&:body)).to eq([ "Someone else's", "Which eye? Legal says left, the comic has right." ])
+
+    theirs.user.destroy!
+    get entry_path(cid)
+    expect(response.body).to include("someone no longer here")
+  end
+
   it "links and unlinks a subject from its edit page, only to the project's own entries" do
     cid = project.entries.create!(name: "Cid")
     other = Project.create!(name: "Elsewhere").entries.create!(name: "Cid")

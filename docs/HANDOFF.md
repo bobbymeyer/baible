@@ -34,6 +34,7 @@ shortcut, the document wins until Bobby changes it.
 ```
 Project ─┬─ Kind ──────────┐            (a kind belongs to a project)
          ├─ Entry ─────────┤            (an entry belongs to a project; the bible)
+         │    └─ Note                   (a signed note on an entry)
          └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry)
                 Subject / Variant ─── Batch ─── Candidate        (rounds of generation)
                 Subject / Variant ─── Pick (one per target)      (the chosen file)
@@ -45,6 +46,7 @@ SiteSetting (one row)   User ─ Session
 | `Project` | A world or setting; the top layer | `name` (unique), `description` (never in a prompt), `style`, `negative`, `model`, `loras`, `sound` |
 | `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets` |
 | `Entry` | One thing in the world across kinds (Cid; the harbour town); the entry layer, between kind and subject | `name` (unique in its project), `look`, `loras`, `lore` (never in a prompt) |
+| `Note` | A note on an entry: a question, a decision, a note to whoever draws it next. Never in a prompt | `entry`, `user` (null once their account goes), `body` |
 | `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
 | `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants | `recipe` (frozen at start), `status`, `error`, `submitted_at` |
@@ -148,6 +150,9 @@ at a time), with the fewest nodes that do the job:
 
 - An entry's page is its page in the bible: its lore, its look, and every subject of it, kind by
   kind, with their picks. From it, "Make Cid as…" starts a subject of any kind, of that entry.
+- **Notes** on an entry are a log, newest first, each signed with its author's account and time.
+  Anyone signed in adds one; only its author takes it back (`Entries::NotesController`). They are
+  for people: like lore, never in a prompt, and not in the sidecar.
 - The starter kinds include a **Model sheet**: a character's reference views, each its own
   full-size picture rather than one crowded sheet. The face gets the room (front, both
   three-quarter views, which carry what's on one side only), with a few full-body views (front,

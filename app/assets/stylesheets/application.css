@@ -177,6 +177,13 @@ form.inline, form.button_to { display: inline; margin: 0; }
 .facts dt { color: var(--grey); font-size: 13px; }
 .facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 
+/* Notes on an entry: a log, newest first, a hairline between each. */
+.notes { list-style: none; margin: 24px 0 0; padding: 0; }
+.note { padding: 8px 0 16px; border-top: 1px solid var(--rule); }
+.note__meta { display: flex; gap: 16px; align-items: baseline; margin: 0; font-size: 13px; }
+.note__meta time { color: var(--grey); font-variant-numeric: tabular-nums; }
+.note .prose p { margin: 8px 0 0; }
+
 /* ---------------------------------------------------------------------------
  * Forms
  * ------------------------------------------------------------------------- */
