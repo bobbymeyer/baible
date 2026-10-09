@@ -9,7 +9,7 @@
         <br><span class="alert-text">ComfyUI doesn't list this LoRA yet: its output/loras folder must be one of its LoRA folders (README, "Training"), or move the file into models/loras.</span>
       <% end %>
     </p>
-    <p class="hint"><% family = Comfy::Family.find(using.family)&.label || using.family %>Every image of <%= entry.name %> made with a model of the <%= family %> family starts its layer with the trigger and this LoRA; with another family's model, the LoRA is kept in the recipe, switched off.</p>
+    <p class="hint"><% family = Comfy::Family.new(using.family, using.model).label %>Every image of <%= entry.name %> made with a model that takes <%= family %> LoRAs starts its layer with the trigger and this LoRA; with any other model, the LoRA is kept in the recipe, switched off.</p>
   <% else %>
     <p class="hint"><%= entry.name %> uses no trained LoRA.</p>
   <% end %>

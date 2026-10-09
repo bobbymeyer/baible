@@ -111,6 +111,8 @@ Everything ComfyUI needs apart from the seed is composed from up to five layers,
   its strength in place, or switches it off. Switched-off LoRAs stay in the recipe, for the record.
 - **Size** (image) is the kind's, scaled into the family's trained range, keeping its shape.
 - **Length** (audio) is the subject's `seconds`, or the kind's.
+- The language model's requests can carry more fields (`LLM_EXTRA_BODY`): Qwen3 on llama.cpp
+  needs its thinking turned off, or it can spend the whole reply.
 - An optional OpenAI-compatible language model (`PromptWriter`) rewrites the subject part only,
   in the style the image model's family reads best (booru tags or prose), once per batch, cached.
   If it can't be reached the batch goes ahead as written, and the recipe says why.
@@ -248,6 +250,11 @@ For an entry that must look the same everywhere: examples, a person's choice, a 
 assets made with it. baible curates and records; ComfyUI trains (`Training`, `TrainingJob`,
 `Comfy::Training`).
 
+0. **Train characters on SDXL.** Its lineages have LoRA ecosystems and train on its full models.
+   Distilled models (Krea 2 Turbo, Lightning-style SDXL) train poorly and are for drafts and looks;
+   their family config carries a `training_note` the form shows. `training.model`
+   (`COMFY_TRAINING_MODEL`) is the base model a new set offers first, and SDXL has its own
+   `training` settings. A set's pictures can come from any model.
 1. **Examples.** The entry's look gives a first, word-level consistency; the Model sheet (front,
    both three-quarter views, full-body views), Portrait expressions and a few other kinds give the
    variety a LoRA needs: everything varies except identity. Chains (section 5) help hold the face
@@ -285,8 +292,10 @@ assets made with it. baible curates and records; ComfyUI trains (`Training`, `Tr
 7. **Using it.** When a run is done the entry uses it (`Entry#training`; "Use this LoRA" and "Stop
    using it" switch between runs). In an image recipe of its subjects the entry layer then starts
    with the run's trigger and its LoRA leads the entry's LoRAs at 1.0 (`Entry#trained_lora`). A
-   LoRA belongs to the family it was trained on: in a recipe whose model is of another family it
-   is kept, switched off, and the trigger is left out. A subject can change its strength by naming
+   LoRA belongs to the **pool** of the model it was trained on (`Comfy::Family#lora_pool`): base
+   SDXL, Pony and Illustrious are one family but three pools, since the lineages retrained the
+   text encoder and a LoRA from one makes garbage on another, not an error. In a recipe whose
+   model is outside its pool it is kept, switched off, and the trigger is left out. A subject can change its strength by naming
    it in its own LoRAs. The look stays; shorten it to what the LoRA gets wrong.
 8. **Again.** Picks made with v1 can go into v2's set. Every run stays on the entry's page with its
    set, captions, settings, result and error; deleting one is refused while ComfyUI has it, and
@@ -371,6 +380,11 @@ Scene (beats), Map, Music. Model sheet has no slot there: it's reference for bai
 
 - Omakase Rails until it is painful not to be. Rails 8.1 defaults: SQLite for everything (Solid
   Queue, Cache and Cable included), Propshaft, importmap, Hotwire, Active Storage on disk. No Node.
+- Production keeps its four SQLite databases in `storage/` and Active Storage's files where
+  `ACTIVE_STORAGE_ROOT` says (a volume of their own), so the small databases can be archived often
+  and the growing image library on its own terms. `GET /health` (HealthController) reads the users
+  table, signed out, and is what a healthcheck or deploy gate should probe: `/up` and the
+  signed-out redirect never touch the database. `deploy/studio/` is the Studio's stack.
 - Gems beyond `rails new`: `rspec-rails`, `bcrypt` (the authentication generator),
   `image_processing` (libvips, which `Cutout` and `Headshot` use directly). Nothing else until a
   concrete problem calls for it. HTTP is `Net::HTTP` (`Remote`).

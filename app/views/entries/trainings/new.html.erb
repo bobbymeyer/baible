@@ -18,8 +18,14 @@
       </div>
     </div>
     <%= render "shared/model_field", name: "model", id: "model", value: @model, inherited: @model %>
-    <p class="hint">The base model to train on. The LoRA only works with models of its family, so use the one <%= @entry.name %>'s assets will be made with.</p>
-    <% defaults = Comfy::Family.for(@model, capabilities: Comfy.capabilities).training %>
+    <% family = Comfy::Family.for(@model, capabilities: Comfy.capabilities) %>
+    <p class="hint">
+      The base model to train on: a full SDXL model, for a character. The LoRA works only with models that take its family's LoRAs
+      (SDXL, Pony and Illustrious each have their own), so train on the lineage <%= @entry.name %>'s assets will be made with.
+      The pictures can come from any model.
+    </p>
+    <% if family.training_note %><p class="alert-text"><%= family.label %>: <%= family.training_note %></p><% end %>
+    <% defaults = family.training %>
     <div class="field-row">
       <% Training::SETTINGS.each do |key| %>
         <div class="field">

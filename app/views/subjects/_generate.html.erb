@@ -21,7 +21,7 @@
   <% if image %>
     <%= render "shared/model_field", name: "subject[model]", id: "subject_model", value: subject.model,
                                      inherited: ArtDirection.pick_model(subject.kind.model, project.model, Comfy.config[:model]) %>
-    <%= render "shared/loras", name: "subject[loras]", loras: subject.loras, above: ArtDirection.stack_loras(project.loras, subject.kind.loras, subject.entry_loras(subject.image_family.slug)) %>
+    <%= render "shared/loras", name: "subject[loras]", loras: subject.loras, above: ArtDirection.stack_loras(project.loras, subject.kind.loras, subject.entry_loras) %>
   <% else %>
     <div class="field">
       <%= label_tag "subject_lyrics", "Lyrics (blank for instrumental)" %>

@@ -17,8 +17,17 @@ shared: &shared
   token: <%= ENV.fetch("LLM_TOKEN", "").to_json %>
   # Any other headers, as a JSON object.
   headers: <%= ENV.fetch("LLM_HEADERS", "{}").to_json %>
-  # Seconds to wait: a server may have to load the model first.
-  timeout: <%= ENV.fetch("LLM_TIMEOUT", "120") %>
+  # Seconds to wait: a server may have to load the model first, and one
+  # that unloads idle models (llama-swap's ttl) can take minutes to load a
+  # big one back, longer while ComfyUI holds the GPU's memory.
+  timeout: <%= ENV.fetch("LLM_TIMEOUT", "600") %>
+  # More fields for every request, as a JSON object, for what a server or
+  # model needs that the OpenAI API doesn't name. Qwen3 on llama.cpp or
+  # llama-swap thinks before it answers unless told not to, and the thinking
+  # can spend the whole reply:
+  #   LLM_EXTRA_BODY='{"chat_template_kwargs":{"enable_thinking":false}}'
+  # Blank for hosted APIs, which may refuse fields they don't know.
+  extra_body: <%= ENV.fetch("LLM_EXTRA_BODY", "{}").to_json %>
 
 development:
   <<: *shared

@@ -33,8 +33,11 @@ class Entries::TrainingsController < ApplicationController
 
   private
 
-  # The model most of its standing pictures were made with, else the default.
+  # The model config/comfy.yml names for training (an SDXL checkpoint), else
+  # the one most of its standing pictures were made with, else the default.
   def default_model
+    return Comfy.config.dig(:training, :model) if Comfy.config.dig(:training, :model).present?
+
     standing = @entry.pick_rows.map { |subject, variant, _| subject.pick_for(variant) }.compact
     standing.filter_map { |pick| pick.recipe["model"].presence }.tally.max_by(&:last)&.first || Comfy.config[:model]
   end

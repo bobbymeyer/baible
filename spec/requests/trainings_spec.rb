@@ -144,6 +144,35 @@ RSpec.describe "Training a LoRA on an entry", type: :request do
     expect(flash[:alert]).to eq("Choose at least one picture for the set")
   end
 
+  it "keeps a LoRA on only for models that take its lineage's LoRAs, and offers the configured base model" do
+    run = train([ pick_one(portrait) ], model: "illustriousXL_v01.safetensors", train: "0")
+    expect(run).to have_attributes(family: "sdxl", lora_pool: "illustrious")
+    expect(run.settings).to include("steps" => 1500) # SDXL's own training settings
+    run.update!(status: "done", lora: "baible/cid-illustrious.safetensors")
+    cid.update!(training: run)
+
+    lora = ->(model) { portrait.update!(model: model) && portrait.reload.recipe["loras"].find { |l| l["name"] == run.lora } }
+    expect(lora.("waiIllustriousSDXL_v150.safetensors")["on"]).to be(true)
+    expect(lora.("ponyDiffusionV6XL.safetensors")["on"]).to be(false)  # Pony: its own pool
+    expect(lora.("juggernautXL_v9.safetensors")["on"]).to be(false)    # base SDXL's pool
+    expect(lora.("anima-preview.safetensors")["on"]).to be(false)
+
+    allow(Comfy).to receive(:config).and_wrap_original do |original|
+      original.call.merge(training: original.call[:training].merge(model: "sdxl_base_1.0.safetensors"))
+    end
+    get new_entry_training_path(cid)
+    expect(page.at("input#model, select#model")["value"] || page.at("select#model option[selected]")&.text).to eq("sdxl_base_1.0.safetensors")
+  end
+
+  it "warns against training on a distilled model" do
+    pick_one(portrait)
+    allow(Comfy).to receive(:config).and_wrap_original do |original|
+      original.call.merge(training: original.call[:training].merge(model: "krea2_turbo_bf16.safetensors"))
+    end
+    get new_entry_training_path(cid)
+    expect(page.at("#training_form .alert-text").text).to include("Krea 2 Turbo", "Train characters on SDXL")
+  end
+
   it "switches the LoRA in use between runs, or off, and deleting the entry takes its runs" do
     face = pick_one(portrait)
     first = train([ face ], train: "0")

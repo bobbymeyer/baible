@@ -76,12 +76,12 @@ class Subject < ApplicationRecord
   # (when that LoRA is on for this family), then its look. Audio has no
   # entry layer (a look isn't a sound); an audio subject joins an entry only
   # to sit on its page.
-  def entry_prompt(family = image_family.slug)
+  def entry_prompt(family = image_family)
     entry && !audio? ? ArtDirection.join_prompt(entry.trained_trigger(family), entry.look) : ""
   end
 
   # The entry's LoRAs: the one it trained first, then any it names.
-  def entry_loras(family = image_family.slug)
+  def entry_loras(family = image_family)
     entry && !audio? ? [ entry.trained_lora(family), *entry.loras ].compact : []
   end
 
@@ -95,7 +95,7 @@ class Subject < ApplicationRecord
       { "label" => kind.name, "role" => "Kind", "prompt" => kind.prompt, "model" => kind.model, "loras" => audio? ? [] : kind.loras }
     ]
     if entry && image?
-      family = image_family.slug
+      family = image_family
       rows << { "label" => entry.name, "role" => "Entry", "prompt" => entry_prompt(family), "model" => nil, "loras" => entry_loras(family) }
     end
     rows << { "label" => name, "role" => "Subject", "prompt" => subject_prompt, "model" => model, "loras" => audio? ? [] : loras }
@@ -117,13 +117,13 @@ class Subject < ApplicationRecord
     model = model_file
     family = Comfy::Family.for(model, capabilities: -> { Comfy.capabilities })
     parts = { "prefix" => family.prefix, "style" => project.style.to_s, "framing" => kind.prompt.to_s,
-              "entry" => entry_prompt(family.slug), "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
+              "entry" => entry_prompt(family), "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
     width, height = family.size(kind.width, kind.height)
     {
       "medium" => "image",
       "model" => model,
       "family" => family.slug,
-      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras(family.slug), loras),
+      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras(family), loras),
       "positive" => ArtDirection.compose(parts),
       "negative" => family.negative? ? ArtDirection.join_prompt(family.negative_prefix, project.negative, kind.negative) : "",
       "width" => width,

@@ -10,8 +10,9 @@
 module Llm
   class Client
     def initialize(url: Llm.config[:url], model: Llm.config[:model], token: Llm.config[:token],
-                   headers: Llm.config[:headers], timeout: Llm.config[:timeout], http: nil)
+                   headers: Llm.config[:headers], timeout: Llm.config[:timeout], extra_body: Llm.config[:extra_body], http: nil)
       @model = model.to_s
+      @extra_body = Llm.extra_body(extra_body)
       @remote = Remote::Connection.new(service: Llm, name: "The language model", url: url, token: token, headers: headers,
                                        headers_setting: "LLM_HEADERS", timeout: timeout.to_i.positive? ? timeout.to_i : 120,
                                        open_timeout: 10, rejection: method(:rejection), http: http)
@@ -32,6 +33,7 @@ module Llm
       payload = { messages: [ { role: "system", content: system }, { role: "user", content: user } ],
                   temperature: temperature, max_tokens: max_tokens, stream: false }
       payload[:model] = @model if @model.present?
+      payload = @extra_body.merge(payload.stringify_keys)
       body = @remote.json(@remote.post_json("/chat/completions", payload))
       text = body.dig("choices", 0, "message", "content").to_s
       text = text.gsub(%r{<think>.*?</think>}m, "").strip

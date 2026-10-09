@@ -77,6 +77,9 @@ class Training < ApplicationRecord
 
   def title = "#{entry.name} v#{version}"
 
+  # The LoRAs it is one of (Comfy::Family#lora_pool), from its base model.
+  def lora_pool = Comfy::Family.new(family, model).lora_pool
+
   # What its files are called: the-drowned-coast-cid-v1.
   def stem = [ entry.project.name.parameterize, entry.name.parameterize, "v#{version}" ].join("-")
 

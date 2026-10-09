@@ -48,7 +48,10 @@ what a failure usually means.
 | `LLM_URL` | blank (off) | An OpenAI-compatible API, up to `/v1` (llama.cpp, llama-swap, Ollama, LM Studio, vLLM, hosted) |
 | `LLM_MODEL` | blank | The model to ask for, as the server names it |
 | `LLM_TOKEN`, `LLM_HEADERS` | blank | As for ComfyUI |
-| `LLM_TIMEOUT` | `120` | Seconds, room for the server to load the model |
+| `LLM_TIMEOUT` | `600` | Seconds, room for the server to load the model (llama-swap unloads idle ones) |
+| `LLM_EXTRA_BODY` | `{}` | More fields for every request, as JSON. Qwen3 on llama.cpp or llama-swap: `{"chat_template_kwargs":{"enable_thinking":false}}`, or its thinking can spend the whole reply |
+| `COMFY_TRAINING_MODEL` | blank | The base model a new training set offers first: a full SDXL checkpoint (README "Training") |
+| `ACTIVE_STORAGE_ROOT` | `storage/` | Where generated files are kept, so they can sit in a volume apart from the databases |
 
 The Settings page overrides the addresses and model names. Tokens, headers and passwords only ever
 live in the environment, never in the database, and no message repeats them.
@@ -128,8 +131,21 @@ image of it made with a model of the same family gets the trigger and the LoRA.
   ```
 
   Or move `output/loras/baible/<name>.safetensors` into `models/loras/baible/` by hand.
-- Settings (steps, rank, learning rate, batch size) start from `training` in `config/comfy.yml`;
-  each run can change them. They're starting points, not tuned values.
+- **Train characters on SDXL.** A LoRA works only on models that take its lineage's LoRAs:
+  base SDXL, Pony and Illustrious each have their own pool, and a LoRA from one makes garbage on
+  another rather than an error. baible switches an entry's LoRA off for any model outside its pool.
+  Krea 2 Turbo and Lightning-style SDXL models are distilled for speed and train poorly: use them
+  for drafts and looks. Set `COMFY_TRAINING_MODEL` to the SDXL checkpoint to train on. The
+  pictures in a set can come from any model.
+- Settings (steps, rank, learning rate, batch size) start from `training` in `config/comfy.yml`,
+  with SDXL's own over them; each run can change them. They're starting points, not tuned values.
+
+## Deploying
+
+`/health` answers 200 only once the database has answered (signed out, to any client), for a
+container healthcheck or a deploy gate; `/up` and the signed-out redirect never touch the database.
+`deploy/studio/` has the compose file and notes for running baible on a Mac behind Caddy on a
+tailnet, beside native ComfyUI and llama-swap.
 
 ## Bringing assets into polychrome
 

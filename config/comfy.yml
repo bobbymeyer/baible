@@ -39,7 +39,15 @@ shared: &shared
   # points for a character from a couple of dozen pictures; a family can
   # have its own (`families.<name>.training`), and each run can change them.
   # ComfyUI runs one thing at a time: batches queued behind a run wait.
+  #
+  # SDXL is the family to train characters on: its lineages have LoRA
+  # ecosystems, and LoRAs work on its full models. Krea 2 Turbo and the
+  # Lightning-style SDXL models are distilled for speed and train poorly;
+  # they are for drafts and looks. `model` is the base model a new training
+  # set offers first (an SDXL checkpoint, say); blank offers the model most
+  # of the set's pictures were made with.
   training:
+    model: <%= ENV.fetch("COMFY_TRAINING_MODEL", "").to_json %>
     steps: 1000
     rank: 16
     learning_rate: 0.0001
@@ -147,6 +155,7 @@ shared: &shared
       variants:
         - match: [turbo]
           label: Krea 2 Turbo
+          training_note: "Distilled for speed, with no LoRA ecosystem: for drafts and looks. Train characters on SDXL."
           steps: 8
           cfg: 1.0
     sd15:
@@ -172,20 +181,32 @@ shared: &shared
       negative: true
       pixels: [786432, 1310720]
       multiple: 64
+      # A character LoRA from a couple of dozen 1024px pictures.
+      training:
+        steps: 1500
+        rank: 16
+        learning_rate: 0.0001
+        batch_size: 1
       variants:
+        # Pony and Illustrious retrained their text encoders: each has its
+        # own pool of LoRAs, which don't carry to the other or to base SDXL
+        # (they make garbage, not an error). lora_pool says which.
         - match: [pony]
           label: Pony
+          lora_pool: pony
           prefix: "score_9, score_8_up, score_7_up"
           negative_prefix: "score_4, score_5, score_6"
           prompt_style: tags
           clip_skip: 2
         - match: [illustrious, noob]
           label: Illustrious
+          lora_pool: illustrious
           prefix: "masterpiece, best quality"
           negative_prefix: "worst quality, low quality"
           prompt_style: tags
           clip_skip: 2
         - match: [lightning, turbo, lcm, hyper, dmd]
+          training_note: "Distilled for speed: a LoRA trained on it works poorly. Train on a full SDXL model of the same lineage."
           steps: 6
           cfg: 1.5
           sampler: [euler, euler_ancestral]

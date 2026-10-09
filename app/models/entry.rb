@@ -32,13 +32,15 @@ class Entry < ApplicationRecord
   # The word its next LoRA learns to answer to: as set, or its name.
   def trigger_or_default = trigger || name.parameterize(separator: "_")
 
-  # The LoRA it uses, for a recipe of the given family: on at full strength
-  # when that is the family it was trained on, else kept but switched off
-  # (docs/HANDOFF.md "The LoRA loop"). nil when it uses none.
+  # The LoRA it uses, for a recipe whose model is of the given family
+  # (Comfy::Family): on at full strength when the model takes the LoRAs of
+  # the one it was trained on (the same pool: SDXL, Pony, Illustrious),
+  # else kept but switched off (docs/HANDOFF.md "The LoRA loop"). nil when
+  # it uses none.
   def trained_lora(family)
     return unless training&.lora
 
-    { "name" => training.lora, "strength" => 1.0, "on" => training.family == family.to_s }
+    { "name" => training.lora, "strength" => 1.0, "on" => training.lora_pool == family.lora_pool }
   end
 
   # The trigger that leads its layer: the one its LoRA learned, while that
