@@ -10,6 +10,10 @@
 #     schedule: at 5am every day
 
 production:
+  # Lets tonight's queue into ComfyUI one thing at a time (NightShift).
+  night_shift:
+    class: NightShiftJob
+    schedule: every minute
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12

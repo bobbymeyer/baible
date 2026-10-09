@@ -34,6 +34,9 @@ services:
       # characters train on SDXL once it's installed (COMFY_TRAINING_MODEL).
       COMFY_MODEL: krea2_turbo_bf16.safetensors
       COMFY_TRAINING_MODEL: ""
+      # The night window (Overnight) is in this zone: 23:00 to 07:00 unless
+      # the Settings page says otherwise.
+      NIGHT_TIME_ZONE: America/Los_Angeles
       LLM_URL: http://host.docker.internal:8090/v1
       LLM_MODEL: qwen-moe
       # Qwen3 thinks first unless told not to, and the thinking can spend the

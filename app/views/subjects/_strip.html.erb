@@ -1,7 +1,9 @@
 <%# One batch's candidates. The frame reloads as they land. %>
 <div class="batch" id="<%= dom_id(batch) %>">
-  <h3><%= batch.draft? ? "Drafts" : (batch.recipe["refines"] ? "Made properly" : "Candidates") %> for <%= batch.title %><%= ", #{batch.source_label}" if batch.source_label %></h3>
+  <h3><%= "Overnight: " if batch.night? %><%= batch.draft? ? "Drafts" : (batch.recipe["refines"] ? "Made properly" : "Candidates") %> for <%= batch.title %><%= ", #{batch.source_label}" if batch.source_label %></h3>
   <% case batch.status %>
+  <% when "scheduled" %>
+    <p class="batch__status" role="status">Queued for tonight (<%= NightShift.window.label %>): <%= pluralize(batch.candidates.size, "candidate") %>, made when the night shift gets to it.</p>
   <% when "queued", "running" %>
     <p class="batch__status" role="status">Generating: <%= batch.candidates.count(&:finished?) %> of <%= batch.candidates.size %> in.</p>
   <% when "waiting" %>
@@ -41,5 +43,5 @@
     <summary>Its recipe</summary>
     <%= render "subjects/recipe", recipe: batch.recipe %>
   </details>
-  <%= button_to "Discard these", subject_batch_path(batch.subject, batch), method: :delete, class: "link-button", form: { data: { turbo_frame: "_top" } } %>
+  <%= button_to batch.status == "scheduled" ? "Not tonight" : "Discard these", subject_batch_path(batch.subject, batch), method: :delete, class: "link-button", form: { data: { turbo_frame: "_top" } } %>
 </div>

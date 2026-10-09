@@ -26,8 +26,10 @@ class Entries::TrainingsController < ApplicationController
 
     training = Training.start!(@entry, rows, trigger: params[:trigger].presence || @entry.trigger_or_default,
                                model: params[:model].presence || default_model, settings: params.fetch(:settings, {}).permit(*Training::SETTINGS),
-                               user: Current.user, train: params[:train] == "1")
-    notice = training.status == "set" ? "#{training.title} kept: #{training.items.size} pictures." : "#{training.title} is training in ComfyUI."
+                               user: Current.user, train: { "1" => :now, "tonight" => :tonight }[params[:train]])
+    notice = { "set" => "#{training.title} kept: #{training.items.size} pictures.",
+               "scheduled" => "#{training.title} will train tonight, after the night's generations." }
+               .fetch(training.status, "#{training.title} is training in ComfyUI.")
     redirect_to entry_path(@entry, anchor: "lora"), notice: notice, status: :see_other
   end
 

@@ -109,6 +109,21 @@
   <% if subject.variants.any? %>
     <p class="hint">A variant's first candidate takes the seed of <%= subject.name %>'s own pick, when there is one. Every variant queues one strip each.</p>
   <% end %>
+
+  <fieldset class="panel" id="tonight">
+    <legend>Or tonight</legend>
+    <div class="actions">
+      <%= button_tag "Queue for tonight", type: "submit", class: "button", name: "tonight", value: "1" %>
+      <% if subject.variants.any? %>
+        <%= button_tag "Queue every variant for tonight", type: "submit", class: "button button--quiet", name: "tonight", value: "every" %>
+      <% end %>
+    </div>
+    <p class="hint">
+      The same batch, made in the night window (<%= NightShift.window.label %>; <%= link_to "Settings", settings_path(anchor: "night") %>) while ComfyUI
+      is otherwise idle, one thing at a time, at full quality (no drafts). It replaces nothing, and waits on the
+      <%= link_to "Overnight", night_path %> page for the morning. The recipe is frozen now.
+    </p>
+  </fieldset>
 <% end %>
 
 <details>

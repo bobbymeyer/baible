@@ -6,6 +6,10 @@ Rails.application.routes.draw do
   # Where ComfyUI and the language model are (SiteSetting), with a check.
   resource :settings, only: %i[show update]
 
+  # Overnight: what's queued for tonight's window, and what last night made,
+  # for review (NightShift).
+  resource :night, only: :show
+
   # Projects, the top layer; their kinds (the middle layer, "art direction"),
   # their entries (the bible: Cid, across every kind he's made in), and making
   # subjects in them. A project's manifest lists its picks.
@@ -32,7 +36,7 @@ Rails.application.routes.draw do
   # not (use), its set as a .tar (set), and deleting it.
   resources :trainings, only: :destroy do
     scope module: :trainings do
-      resource :run, only: :create
+      resource :run, only: %i[create destroy]
       resource :use, only: %i[create destroy]
       resource :set, only: :show
     end

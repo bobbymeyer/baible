@@ -8,6 +8,9 @@
 class Batch < ApplicationRecord
   include ComfyRun
 
+  # "scheduled": queued for the night window (NightShift), not yet let go.
+  STATUSES = [ "scheduled", *ComfyRun::STATUSES ].freeze
+
   belongs_to :subject
   belongs_to :variant, optional: true
   has_many :candidates, -> { order(:position) }, dependent: :destroy
@@ -16,8 +19,9 @@ class Batch < ApplicationRecord
 
   after_commit :refresh_watchers
 
-  # A new batch replaces any earlier one for the same target: the strip
-  # shows one round at a time. The first candidate tries a seed hint when
+  # A new batch replaces any earlier one for the same target, except those
+  # made overnight, which wait to be reviewed: the strip shows one round at
+  # a time, plus the night's. The first candidate tries a seed hint when
   # there is one (the picture it starts from, or the subject's own pick for
   # a variant), so a face stays closer across variants.
   # write: let the language model (if there is one) rewrite the subject.
@@ -27,7 +31,12 @@ class Batch < ApplicationRecord
   # source: a pick to redraw from instead of starting blank (a chain):
   # { "pick_id" => n, "crop" => "head" | nil }, re-noised by denoise; it is
   # put in ComfyUI's inputs when the batch runs. Images only.
-  def self.start!(subject, variant: nil, count: Comfy.config[:candidates], write: true, transparent: nil, draft: false, source: nil, denoise: nil)
+  # tonight: queue it for the night window instead (NightShift): it waits as
+  # "scheduled", is made at full quality (no drafts: nobody is there to
+  # choose one), and replaces nothing, as nothing replaces it but a pick.
+  def self.start!(subject, variant: nil, count: Comfy.config[:candidates], write: true, transparent: nil, draft: false, source: nil,
+                  denoise: nil, tonight: false)
+    draft = false if tonight
     raise ArgumentError, "That variant is another subject's" if variant && variant.subject_id != subject.id
 
     count = count.to_i.clamp(1, 8)
@@ -37,7 +46,7 @@ class Batch < ApplicationRecord
     hint = from ? from.seed : subject.seed_hint(variant)
     seeds[0] = hint if hint
     batch = transaction do
-      subject.batches.where(variant: variant).destroy_all
+      subject.batches.where(variant: variant, night: false).destroy_all unless tonight
       recipe = subject.recipe(variant)
       if subject.image?
         recipe["write"] = write && Llm.enabled?
@@ -52,12 +61,20 @@ class Batch < ApplicationRecord
         end
         recipe = draft_of(recipe) if draft
       end
-      create!(subject: subject, variant: variant, recipe: recipe).tap do |b|
+      create!(subject: subject, variant: variant, recipe: recipe, night: tonight, status: tonight ? "scheduled" : "queued").tap do |b|
         seeds.each_with_index { |seed, i| b.candidates.create!(position: i, seed: seed) }
       end
     end
-    BatchJob.perform_later(batch)
+    BatchJob.perform_later(batch) unless tonight
     batch
+  end
+
+  # The night shift lets it go: into ComfyUI, as if just started.
+  def release!
+    raise ArgumentError, "Only a scheduled batch is let go" unless status == "scheduled"
+
+    update!(status: "queued", released_at: Time.current)
+    BatchJob.perform_later(self)
   end
 
   # A recipe made quick: the family's draft steps and size. The background
@@ -85,7 +102,7 @@ class Batch < ApplicationRecord
     recipe = batch.recipe.except("draft", "steps", "full", "workflow", "source_image").merge(batch.recipe["full"])
                   .merge("write" => false, "refines" => { "batch_id" => batch.id, "candidate_id" => candidate.id }, "denoise" => family.refine_denoise)
     refinement = transaction do
-      batch.subject.batches.where(variant_id: batch.variant_id).where.not(id: batch.id).destroy_all
+      batch.subject.batches.where(variant_id: batch.variant_id, night: false).where.not(id: batch.id).destroy_all
       create!(subject: batch.subject, variant: batch.variant, recipe: recipe).tap { |b| b.candidates.create!(position: 0, seed: candidate.seed) }
     end
     BatchJob.perform_later(refinement)
@@ -197,7 +214,7 @@ class Batch < ApplicationRecord
   end
 
   # When ComfyUI took it; a batch made before ComfyUI could be reached counts from when it was made.
-  def comfy_started_at = submitted_at || created_at
+  def comfy_started_at = submitted_at || released_at || created_at
 
   # Only the studio's batches reload (app/javascript/stream_actions.js), so
   # a form being typed into elsewhere on the page is left alone.

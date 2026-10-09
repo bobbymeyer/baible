@@ -12,6 +12,7 @@
 #   fetch(image)  → bytes          capabilities      → Comfy::Capabilities
 #   upload(bytes, name, subfolder:, content_type:) → the name ComfyUI keeps it under
 #   run_seconds(prompt id) → how long ComfyUI spent on it, once finished
+#   queue_size → how many prompts it is running or has waiting, from anyone
 module Comfy
   class Client
     def initialize(url: Comfy.config[:url], token: Comfy.config[:token], headers: Comfy.config[:headers], http: nil, timeout: 30)
@@ -43,6 +44,12 @@ module Comfy
       return nil if status.key?("completed") && !status["completed"]
 
       entry.fetch("outputs", {}).values.flat_map { |output| Array(output["images"]) + Array(output["audio"]) }.reject { |file| file["type"] == "temp" }
+    end
+
+    # How many prompts ComfyUI is running or has waiting, from anyone.
+    def queue_size
+      queue = get_json("/queue")
+      Array(queue["queue_running"]).size + Array(queue["queue_pending"]).size
     end
 
     # Seconds from ComfyUI starting a prompt to finishing it, from the

@@ -6,9 +6,9 @@ ComfyUI from layered recipes, picked by a person, and handed on as files. Rails 
 This document is the design contract. Read it before writing code. Where it conflicts with a
 shortcut, the document wins until Bobby changes it.
 
-**Status.** Everything here is built except what is marked **Planned**: the language model's part
-in running unknown models and building workflows (section 4, "Unknown models and new
-workflows"). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
+**Status.** Everything here is built except what is marked **Planned**: the night shift's
+standing orders (section 7), and the language model's part in running unknown models and
+building workflows (section 4, "Unknown models and new workflows"). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
 open questions are listed there.
 
 ## 1. What it is
@@ -36,7 +36,7 @@ open questions are listed there.
 
 - Not a game, and no knowledge of any game. baible has no idea what a monster, a book or a beat
   is; polychrome's kinds are just kinds a project can have.
-- No API between baible and polychrome (or anything else). Assets leave as files (section 8).
+- No API between baible and polychrome (or anything else). Assets leave as files (section 9).
 - No asset library or DAM features: tagging, search, collections. Picks keep their history so
   canon and training sets can be chosen from them; that is all. An entry gathers what depicts one
   thing; it is not a folder or a tag.
@@ -66,11 +66,11 @@ SiteSetting (one row)   User ─ Session
 | `Note` | A note on an entry: a question, a decision, a note to whoever draws it next. Never in a prompt | `entry`, `user` (null once their account goes), `body` |
 | `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
-| `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants | `recipe` (frozen at start), `status`, `error`, `submitted_at` |
+| `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants; or one queued for the night (section 7) | `recipe` (frozen at start), `status` (`scheduled` for tonight, then `queued` …), `error`, `night`, `released_at`, `submitted_at` |
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
 | `Pick` | A chosen file for a target, and how it was made. Kept: a target has a history, one `current` pick and at most one canon pick (section 5) | `seed`, `prompt`, `recipe`, `run_seconds`, `user` (who picked it), `current`, `canon_at`, `canon_by` (a user), attached `file` |
-| `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning | see section 7 |
-| `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6); "set" is a set kept without training | `entry`, `user`, `version`, `status` (`set`, then as a batch), `error`, `trigger`, `model`, `family`, `settings`, `items` (`[{ pick_id, title, seed, sha256, file, caption }]`), `lora` (the file), `workflow`, `comfy_prompt_id`, `submitted_at`, `run_seconds` |
+| `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning, the night window | see sections 7 and 8 |
+| `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6); "set" is a set kept without training, "scheduled" one to train tonight (section 7) | `entry`, `user`, `version`, `status` (`set`, `scheduled`, then as a batch), `error`, `trigger`, `model`, `family`, `settings`, `items` (`[{ pick_id, title, seed, sha256, file, caption }]`), `lora` (the file), `workflow`, `comfy_prompt_id`, `submitted_at`, `run_seconds` |
 
 - A new project starts with the kinds in `config/comfy.yml` (`kinds`) unless asked not to; each is
   editable and removable. A kind with subjects can't be removed or change medium.
@@ -181,7 +181,7 @@ the config doesn't know.
 - **Generate** (`Subjects::BatchesController#create`) first saves the subject layer as written in
   the studio, then `Batch.start!` freezes the recipe and makes 1–8 candidates, each its own seed,
   for the subject, one variant, or every variant (one batch each). A new batch replaces the
-  target's previous one.
+  target's previous one, except the night's (section 7).
 - `BatchJob` uploads any source image, submits every candidate, then re-enqueues itself every few
   seconds (`ApplicationJob#poll_comfy`) collecting files as they land, without holding a worker,
   until all are in, it fails, or it times out (`timeout`). ComfyUI unreachable means `waiting` and
@@ -312,7 +312,36 @@ particular), whether a folder made by upload just before queueing passes `LoadIm
 folder check, sensible settings per family, and what a run costs in time and memory on the GPU
 baible will use.
 
-## 7. Settings
+## 7. Overnight
+
+The machine is idle at night and its owner is asleep: baible uses the time to make what can be
+made unattended, for review in the morning (`NightShift`, `NightShiftJob`, `NightsController`).
+
+- **The night window** is `night` in config/comfy.yml (23:00 to 07:00, `NIGHT_TIME_ZONE`), and the
+  Settings page overrides it. It may cross midnight.
+- **Queueing.** "Queue for tonight" (or every variant) in a studio makes the same batch as
+  Generate, recipe frozen then, but as `scheduled` and `night`: no job yet, no drafts (nobody is
+  there to choose one; it renders at full quality), and **it replaces nothing and nothing replaces
+  it** but a pick or a discard: a morning's Generate replaces the target's daytime batch only, so
+  the night's work survives until it is reviewed. "Train tonight" on a training set, or on a kept
+  or failed run, makes it `scheduled`.
+- **The night shift** (`NightShiftJob`, every minute under Solid Queue, `config/recurring.yml`;
+  `bin/rails night:tick` by hand) lets **one** thing go at a time, and only when: the window is
+  open, nothing of baible's is queued, waiting or running with ComfyUI, and ComfyUI's own queue
+  is empty (`Comfy::Client#queue_size`; it may be busy with work from elsewhere). Generations go
+  first, oldest first; then training runs, which take hours. One at a time means whatever someone
+  starts by hand at night is never behind the whole queue. Nothing new starts after the window
+  closes; what is running finishes. A released batch counts its time with ComfyUI from its
+  release (`released_at`), not from the afternoon it was queued.
+- **Overnight** (the page, in the masthead with how much is queued): tonight's queue, with "Not
+  tonight" to take a batch or run off it, and what the night made: its batches still waiting for a
+  pick (the studio's strips, Use this included), and training runs that finished or failed in the
+  last day.
+- **Planned, not built:** standing orders (every night, fill the gaps: a batch for each target
+  without a pick, more candidates for those without canon); training on a rented GPU from the same
+  queue; a morning summary pushed somewhere rather than waiting to be looked at.
+
+## 8. Settings
 
 `SiteSetting` (one row, the Settings page) overrides `config/comfy.yml` and `config/llm.yml`, which
 read the environment: ComfyUI's address, default image and audio models, the background-removal
@@ -322,7 +351,7 @@ environment (`COMFY_TOKEN`, `COMFY_HEADERS`, basic auth in `COMFY_URL`, `LLM_TOK
 and a URL with a password in it is refused. `ConnectionCheck` explains, step by step, why ComfyUI
 or the language model can't be reached (also `bin/rails services:check`).
 
-## 8. Export
+## 9. Export
 
 Assets leave baible as files. There is no API.
 
@@ -376,7 +405,7 @@ polychrome's base world maps onto baible's starter kinds: Creature (Bestiary), C
 Portrait (speakers; the expressions are Portrait's variants), Item, Emblem (abilities), Location,
 Scene (beats), Map, Music. Model sheet has no slot there: it's reference for baible's own use.
 
-## 9. Stack
+## 10. Stack
 
 - Omakase Rails until it is painful not to be. Rails 8.1 defaults: SQLite for everything (Solid
   Queue, Cache and Cable included), Propshaft, importmap, Hotwire, Active Storage on disk. No Node.
@@ -392,7 +421,7 @@ Scene (beats), Map, Music. Model sheet has no slot there: it's reference for bai
   over HTTP. Optionally any OpenAI-compatible language model.
 - Jobs run in Solid Queue (`bin/jobs`, or `SOLID_QUEUE_IN_PUMA`).
 
-## 10. Conventions
+## 11. Conventions
 
 - Controllers only do CRUD. A verb is a resource that hasn't been named yet: generating is
   `Subjects::BatchesController#create`, picking `Candidates::PicksController#create`, making a

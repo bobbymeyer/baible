@@ -1,0 +1,66 @@
+<% content_for :title, "Overnight" %>
+<div class="page-header">
+  <h1>Overnight</h1>
+</div>
+<p class="prose">
+  The night window is <strong><%= @window.label %></strong> (<%= link_to "Settings", settings_path(anchor: "night") %>).
+  <% if @window.open? %>It's open now.<% else %>It opens in <%= distance_of_time_in_words(Time.current, @window.opens_at) %>.<% end %>
+  What's queued goes into ComfyUI one thing at a time while it has nothing else: generations first, oldest first, then training.
+  Nothing new starts after the window closes.
+</p>
+
+<section class="window" id="tonight">
+  <h2>Queued for tonight</h2>
+  <% if @queued_batches.empty? && @queued_trainings.empty? %>
+    <p class="empty">Nothing yet. "Queue for tonight" in a subject's studio, or "Train tonight" on an entry's training set.</p>
+  <% else %>
+    <table class="table">
+      <thead><tr><th scope="col">What</th><th scope="col">Project</th><th scope="col">Size</th><th scope="col"></th></tr></thead>
+      <tbody>
+        <% @queued_batches.each do |batch| %>
+          <tr id="<%= dom_id(batch) %>">
+            <td><%= link_to batch.title, subject_path(batch.subject, anchor: "batches") %><br><small class="muted"><%= batch.subject.kind.name %></small></td>
+            <td><%= batch.subject.project.name %></td>
+            <td><%= pluralize(batch.candidates.size, "candidate") %></td>
+            <td><%= button_to "Not tonight", subject_batch_path(batch.subject, batch), method: :delete, class: "link-button" %></td>
+          </tr>
+        <% end %>
+        <% @queued_trainings.each do |run| %>
+          <tr id="<%= dom_id(run) %>">
+            <td><%= link_to "Train #{run.title}", entry_path(run.entry, anchor: "lora") %><br><small class="muted">a LoRA, on <%= run.model %></small></td>
+            <td><%= run.entry.project.name %></td>
+            <td><%= pluralize(run.items.size, "picture") %>, <%= run.settings["steps"] %> steps</td>
+            <td><%= button_to "Not tonight", training_run_path(run), method: :delete, class: "link-button" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
+
+<section class="window" id="made">
+  <h2>Made overnight</h2>
+  <% if @made.empty? && @trained.empty? %>
+    <p class="empty">Nothing waiting for review.</p>
+  <% end %>
+  <% @trained.each do |run| %>
+    <p id="<%= dom_id(run, :made) %>">
+      <strong><%= link_to run.title, entry_path(run.entry, anchor: "lora") %></strong>
+      <% if run.status == "done" %>
+        trained<%= " in #{run_time(run.run_seconds)}" if run.run_seconds %>: <code><%= run.lora %></code>
+      <% else %>
+        <span class="alert-text">failed: <%= run.error %></span>
+      <% end %>
+    </p>
+  <% end %>
+  <% @made.group_by { |batch| batch.subject.project }.each do |project, batches| %>
+    <h3><%= project.name %></h3>
+    <% batches.each do |batch| %>
+      <p class="hint"><%= link_to "#{batch.subject.kind.name}: #{batch.subject.name}'s studio", subject_path(batch.subject) %></p>
+      <%= render "subjects/strip", batch: batch %>
+    <% end %>
+  <% end %>
+  <% if @made.any? %>
+    <p class="hint">Each strip stays until one of it is picked (Use this) or it's discarded.</p>
+  <% end %>
+</section>

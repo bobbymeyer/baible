@@ -109,6 +109,21 @@
     </div>
   </fieldset>
 
+  <% night_env = Rails.configuration.x.comfy.fetch(:night, {}) %>
+  <fieldset class="panel" id="night">
+    <legend>The night window</legend>
+    <div class="field-row">
+      <div class="field"><%= f.label :night_start, "From" %><%= f.text_field :night_start, placeholder: night_env[:start], pattern: "[0-2][0-9]:[0-5][0-9]" %></div>
+      <div class="field"><%= f.label :night_end, "To" %><%= f.text_field :night_end, placeholder: night_env[:end], pattern: "[0-2][0-9]:[0-5][0-9]" %></div>
+      <div class="field field--wide"><%= f.label :night_zone, "Time zone" %><%= f.text_field :night_zone, placeholder: night_env[:zone], list: "time_zones" %></div>
+    </div>
+    <datalist id="time_zones"><% ActiveSupport::TimeZone.all.map { |zone| zone.tzinfo.name }.uniq.each do |name| %><option value="<%= name %>"></option><% end %></datalist>
+    <p class="hint">
+      What's queued for tonight goes into ComfyUI in this window, one thing at a time and only while ComfyUI has nothing else, generations
+      before training; nothing new starts after it closes. It may cross midnight. Now: <%= NightShift.window.label %>.
+    </p>
+  </fieldset>
+
   <div class="actions"><%= f.submit "Save and check", class: "button button--primary" %></div>
 <% end %>
 
