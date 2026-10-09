@@ -7,6 +7,8 @@
 class NightsController < ApplicationController
   def show
     @window = NightShift.window
+    @orders = StandingOrder.includes(:project, :kind, :entry).order(:id)
+    @order = StandingOrder.new(project: Project.order(:name).first)
     @queued_batches = NightShift.queued_batches.includes(:variant, :candidates, subject: %i[project kind])
     @queued_trainings = NightShift.queued_trainings.includes(entry: :project)
     @made = Batch.where(night: true).where.not(status: "scheduled").order(:id)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_170000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -174,6 +174,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_160000) do
     t.string "night_zone"
   end
 
+  create_table "standing_orders", force: :cascade do |t|
+    t.integer "project_id", null: false
+    t.integer "kind_id"
+    t.integer "entry_id"
+    t.integer "user_id"
+    t.string "action", null: false
+    t.integer "count", default: 4, null: false
+    t.integer "nightly_limit", default: 20, null: false
+    t.integer "min_pictures", default: 12, null: false
+    t.string "model"
+    t.boolean "enabled", default: true, null: false
+    t.datetime "planned_at"
+    t.text "report"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["entry_id"], name: "index_standing_orders_on_entry_id"
+    t.index ["kind_id"], name: "index_standing_orders_on_kind_id"
+    t.index ["project_id"], name: "index_standing_orders_on_project_id"
+    t.index ["user_id"], name: "index_standing_orders_on_user_id"
+  end
+
   create_table "subjects", force: :cascade do |t|
     t.integer "project_id", null: false
     t.integer "kind_id", null: false
@@ -249,6 +270,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_160000) do
   add_foreign_key "picks", "users", column: "canon_by_id"
   add_foreign_key "picks", "variants"
   add_foreign_key "sessions", "users"
+  add_foreign_key "standing_orders", "entries"
+  add_foreign_key "standing_orders", "kinds"
+  add_foreign_key "standing_orders", "projects"
+  add_foreign_key "standing_orders", "users"
   add_foreign_key "subjects", "entries"
   add_foreign_key "subjects", "kinds"
   add_foreign_key "subjects", "projects"

@@ -111,6 +111,9 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
    time while ComfyUI is otherwise idle, generations before training. In the morning the
    **Overnight** page has what the night made, ready to pick from. Production runs the night shift
    every minute under Solid Queue; in development, `bin/rails night:tick` runs one tick by hand.
+   **Standing orders** (under "Every night" on that page) plan the night's work themselves: fill
+   a project's gaps, keep going until each target has canon, or train an entry's LoRA once it has
+   enough canon pictures. A target still waiting for review gets nothing new.
 
 Every pick has **Download** (the file) and **Sidecar** (how it was made, as JSON; the schema is in
 HANDOFF "Export"). The project's **Manifest** lists the pick that stands for each target (canon,

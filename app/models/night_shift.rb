@@ -10,7 +10,8 @@
 # the window is open, nothing of baible's is with ComfyUI (queued, waiting
 # or running), and ComfyUI's own queue is empty (it may be busy with work
 # from elsewhere). Generations go first, oldest first; training runs, which
-# take hours, after them.
+# take hours, after them. The first tick of each night also plans the
+# standing orders' share (StandingOrder), queued after what was queued by hand.
 module NightShift
   Window = Data.define(:start, :finish, :zone) do
     # Whether the window is open at a moment. A window may cross midnight.
@@ -30,6 +31,16 @@ module NightShift
       candidate = local.change(hour: hour, min: minute)
       candidate += 1.day if candidate <= local
       candidate
+    end
+
+    # When the window that is open now opened, or nil when it's closed.
+    def opened_at(at = Time.current)
+      return unless open?(at)
+
+      local = at.in_time_zone(zone)
+      hour, minute = start.split(":").map(&:to_i)
+      opened = local.change(hour: hour, min: minute)
+      opened > local ? opened - 1.day : opened
     end
 
     def label = "#{start} to #{finish}, #{zone.name}"
@@ -52,6 +63,13 @@ module NightShift
     Window.new(start: night.fetch(:start, "23:00").to_s, finish: night.fetch(:end, "07:00").to_s, zone: zone)
   end
 
+  # The standing orders' share of tonight, once a night window (each order
+  # remembers when it last planned).
+  def plan!(at = Time.current)
+    opened = window.opened_at(at) or return
+    StandingOrder.enabled.includes(:project, :kind, :entry).find_each { |order| order.plan!(opened) }
+  end
+
   def queued_batches = Batch.where(status: "scheduled").order(:id)
   def queued_trainings = Training.where(status: "scheduled").order(:updated_at, :id)
 
@@ -65,6 +83,7 @@ module NightShift
   def tick!(client: Comfy.client, at: Time.current)
     return :closed unless window.open?(at)
 
+    plan!(at)
     batch = queued_batches.first
     training = queued_trainings.first unless batch
     return :nothing_queued unless batch || training

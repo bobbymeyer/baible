@@ -64,3 +64,74 @@
     <p class="hint">Each strip stays until one of it is picked (Use this) or it's discarded.</p>
   <% end %>
 </section>
+
+<section class="window" id="orders">
+  <h2>Every night</h2>
+  <p class="hint">
+    Standing orders: at the first tick of each night window, each queues what it's owed, after whatever was queued by hand. A target
+    still waiting for review of an earlier night's batch gets nothing new until it's picked from or discarded, so unreviewed work
+    doesn't pile up.
+  </p>
+  <% if @orders.any? %>
+    <table class="table">
+      <thead><tr><th scope="col">Order</th><th scope="col">For</th><th scope="col">Last night</th><th scope="col"></th></tr></thead>
+      <tbody>
+        <% @orders.each do |order| %>
+          <tr id="<%= dom_id(order) %>" class="<%= 'is-off' unless order.enabled? %>">
+            <td>
+              <strong><%= order.label %></strong><%= tag.span(" (off)", class: "muted") unless order.enabled? %><br>
+              <small class="muted">
+                <% if order.action == "train" %>
+                  at <%= pluralize(order.min_pictures, "canon picture") %>, on <%= order.model || Comfy.config.dig(:training, :model).presence || "no model yet" %>
+                <% else %>
+                  <%= pluralize(order.count, "candidate") %> a target, at most <%= pluralize(order.nightly_limit, "batch") %> a night
+                <% end %>
+              </small>
+            </td>
+            <td><%= order.scope_label %><% if order.entry || order.kind %><br><small class="muted"><%= order.project.name %></small><% end %></td>
+            <td><%= order.report || tag.span("Not planned yet", class: "muted") %><% if order.planned_at %><br><small class="muted"><%= time_ago_in_words(order.planned_at) %> ago</small><% end %></td>
+            <td class="trainings__actions">
+              <%= button_to order.enabled? ? "Turn off" : "Turn on", standing_order_path(order), method: :patch,
+                            params: { standing_order: { enabled: order.enabled? ? "0" : "1" } }, class: "link-button", form: { class: "inline" } %>
+              <%= button_to "Delete", standing_order_path(order), method: :delete, class: "link-button",
+                            form: { class: "inline", data: { turbo_confirm: "Delete this standing order?" } } %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+  <% projects = Project.order(:name).includes(:kinds, :entries) %>
+  <% if projects.empty? %>
+    <p class="empty">Make a project first.</p>
+  <% else %>
+    <%= form_with model: @order, url: standing_orders_path, class: "form" do |f| %>
+      <div class="field-row">
+        <div class="field"><%= f.label :action, "Every night" %><%= f.select :action, StandingOrder::ACTIONS.invert %></div>
+        <div class="field"><%= f.label :project_id, "In" %><%= f.select :project_id, projects.map { |p| [ p.name, p.id ] } %></div>
+        <div class="field">
+          <%= f.label :kind_id, "Only the kind" %>
+          <%= f.select :kind_id, grouped_options_for_select(projects.map { |p| [ p.name, p.kinds.map { |k| [ k.name, k.id ] } ] }), include_blank: "Every kind" %>
+        </div>
+        <div class="field">
+          <%= f.label :entry_id, "Only the entry" %>
+          <%= f.select :entry_id, grouped_options_for_select(projects.map { |p| [ p.name, p.entries.map { |e| [ e.name, e.id ] } ] }), include_blank: "Every subject" %>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><%= f.label :count, "Candidates a target" %><%= f.number_field :count, min: 1, max: 8 %></div>
+        <div class="field"><%= f.label :nightly_limit, "At most, batches a night" %><%= f.number_field :nightly_limit, min: 1, max: 200 %></div>
+        <div class="field"><%= f.label :min_pictures, "Train at, canon pictures" %><%= f.number_field :min_pictures, min: 1, max: 200 %></div>
+        <div class="field field--wide"><%= f.label :model, "Train on" %><%= f.text_field :model, placeholder: Comfy.config.dig(:training, :model).presence || "an SDXL checkpoint" %></div>
+      </div>
+      <p class="hint">
+        <strong>Fill the gaps</strong>: a batch for every target (a subject, or one of its variants) with nothing picked.
+        <strong>Keep going until canon</strong>: a batch for every target with picks but none approved.
+        <strong>Train when ready</strong> (needs an entry): once the entry has that many canon pictures, and they're not just what its last run
+        trained on, a training run on them, after the night's generations; captions are written from their recipes. The kind and entry must
+        be the project's; the last two fields are for training only.
+      </p>
+      <div class="actions"><%= f.submit "Add the standing order", class: "button" %></div>
+    <% end %>
+  <% end %>
+</section>

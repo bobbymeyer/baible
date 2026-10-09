@@ -9,6 +9,8 @@ Rails.application.routes.draw do
   # Overnight: what's queued for tonight's window, and what last night made,
   # for review (NightShift).
   resource :night, only: :show
+  # Standing orders: what the night shift plans for itself every night.
+  resources :standing_orders, only: %i[create update destroy]
 
   # Projects, the top layer; their kinds (the middle layer, "art direction"),
   # their entries (the bible: Cid, across every kind he's made in), and making
