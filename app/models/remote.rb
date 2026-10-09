@@ -49,6 +49,13 @@ module Remote
       request(req)
     end
 
+    # A plain body of the given type (a webhook taking text).
+    def post_body(path, body, content_type)
+      req = Net::HTTP::Post.new(path(path), @headers.merge("Content-Type" => content_type))
+      req.body = body.to_s
+      request(req)
+    end
+
     # A multipart form: [[name, value], [name, io, { filename:, content_type: }]].
     def post_form(path, fields)
       req = Net::HTTP::Post.new(path(path), @headers)
@@ -91,7 +98,12 @@ module Remote
 
     private
 
-    def path(path) = "#{@base.path}#{path}"
+    # The base's path and the request's; the base's query too, when the
+    # request is to the base itself (a webhook URL carrying its own).
+    def path(path)
+      full = "#{@base.path}#{path}".presence || "/"
+      path.empty? && @base.query ? "#{full}?#{@base.query}" : full
+    end
 
     def parse_headers(headers, setting)
       value = headers.is_a?(String) ? (headers.strip.empty? ? {} : JSON.parse(headers)) : headers.to_h

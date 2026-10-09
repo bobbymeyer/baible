@@ -8,7 +8,7 @@ shortcut, the document wins until Bobby changes it.
 
 **Status.** Everything here is built except what is marked **Planned**: the language model's part
 in running unknown models and building workflows (section 4, "Unknown models and new
-workflows"), and the parts of section 7 marked so (renting a GPU, a pushed morning summary). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
+workflows"), and training on a rented GPU (section 7). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
 open questions are listed there.
 
 ## 1. What it is
@@ -71,6 +71,7 @@ SiteSetting (one row)   User ─ Session
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
 | `Pick` | A chosen file for a target, and how it was made. Kept: a target has a history, one `current` pick and at most one canon pick (section 5) | `seed`, `prompt`, `recipe`, `run_seconds`, `user` (who picked it), `current`, `canon_at`, `canon_by` (a user), attached `file` |
 | `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning, the night window | see sections 7 and 8 |
+| `NightSummary` | One night's summary, written when the window closes (section 7) | `opened_at`, `closed_at` (unique), `text`, `payload`, `sent_at`, `error` |
 | `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6); "set" is a set kept without training, "scheduled" one to train tonight (section 7) | `entry`, `user`, `version`, `status` (`set`, `scheduled`, then as a batch), `error`, `trigger`, `model`, `family`, `settings`, `items` (`[{ pick_id, title, seed, sha256, file, caption }]`), `lora` (the file), `workflow`, `comfy_prompt_id`, `submitted_at`, `run_seconds` |
 
 - A new project starts with the kinds in `config/comfy.yml` (`kinds`) unless asked not to; each is
@@ -338,8 +339,25 @@ made unattended, for review in the morning (`NightShift`, `NightShiftJob`, `Nigh
   tonight" to take a batch or run off it, and what the night made: its batches still waiting for a
   pick (the studio's strips, Use this included), and training runs that finished or failed in the
   last day.
-- **Planned, not built:** training on a rented GPU from the same queue; a morning summary pushed
-  somewhere rather than waiting to be looked at.
+- **Planned, not built:** training on a rented GPU from the same queue.
+
+### The morning summary
+
+At the first tick after the window closes, the night shift writes one summary of that night
+(`NightSummary.write!`, once per night by `closed_at`; `Window#last_night` says which night): the
+batches made, failed and still going with the candidate count, what waits for review by project,
+failures, training runs that ended or are still going, how much was not reached, each standing
+order's report, and a link to the Overnight page (`APP_URL`). The figures are kept too (`payload`).
+
+- It is kept and shown at the top of the Overnight page, with the six mornings before it.
+- **It is sent** when `MORNING_WEBHOOK_URL` is set (environment only: a webhook's address is often
+  its secret): as JSON with a `text` field and the figures beside it (`MORNING_WEBHOOK_FORMAT`
+  `json`, the default: n8n, Slack, Mattermost), or as plain text (`text`: ntfy).
+  `MORNING_WEBHOOK_HEADERS` adds headers as JSON (a token, ntfy's `Title`). A send that fails is
+  kept with its reason on the page and not retried: a summary of last night that turns up at noon
+  is worth less than knowing it didn't arrive.
+- A night that ran nothing still gets a summary ("Nothing ran last night."). Silence and "nothing
+  happened" must not look the same.
 
 ### Standing orders
 

@@ -10,8 +10,9 @@
 # the window is open, nothing of baible's is with ComfyUI (queued, waiting
 # or running), and ComfyUI's own queue is empty (it may be busy with work
 # from elsewhere). Generations go first, oldest first; training runs, which
-# take hours, after them. The first tick of each night also plans the
-# standing orders' share (StandingOrder), queued after what was queued by hand.
+# take hours, after them. The first tick of each night plans the standing
+# orders' share (StandingOrder), queued after what was queued by hand; the
+# first after the window closes writes the morning summary (NightSummary).
 module NightShift
   Window = Data.define(:start, :finish, :zone) do
     # Whether the window is open at a moment. A window may cross midnight.
@@ -41,6 +42,19 @@ module NightShift
       hour, minute = start.split(":").map(&:to_i)
       opened = local.change(hour: hour, min: minute)
       opened > local ? opened - 1.day : opened
+    end
+
+    # When the window last closed, and when that night's window had opened:
+    # [opened, closed], or nil while it's open.
+    def last_night(at = Time.current)
+      return if open?(at)
+
+      local = at.in_time_zone(zone)
+      hour, minute = finish.split(":").map(&:to_i)
+      closed = local.change(hour: hour, min: minute)
+      closed -= 1.day if closed > local
+      length = (minutes(finish) - minutes(start)) % (24 * 60)
+      [ closed - length.minutes, closed ]
     end
 
     def label = "#{start} to #{finish}, #{zone.name}"
@@ -81,9 +95,17 @@ module NightShift
   # One tick: let the next scheduled thing go, when it may. Returns what was
   # let go, or why nothing was (a symbol), for the log and the specs.
   def tick!(client: Comfy.client, at: Time.current)
-    return :closed unless window.open?(at)
+    unless window.open?(at)
+      summarize!(at)
+      return :closed
+    end
 
     plan!(at)
+    release!(client)
+  end
+
+  # The next thing: generations, then training runs.
+  def release!(client)
     batch = queued_batches.first
     training = queued_trainings.first unless batch
     return :nothing_queued unless batch || training
@@ -95,5 +117,14 @@ module NightShift
   rescue Comfy::Error => e
     Rails.logger.info("[night shift] ComfyUI isn't answering: #{e.message}")
     :comfy_unreachable
+  end
+
+  # The morning summary of the night that last closed, once (NightSummary).
+  def summarize!(at = Time.current)
+    opened, closed = window.last_night(at)
+    return unless closed
+    return if NightSummary.exists?(closed_at: closed)
+
+    NightSummary.write!(opened, closed)
   end
 end

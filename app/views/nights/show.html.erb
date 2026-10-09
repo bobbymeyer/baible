@@ -9,6 +9,28 @@
   Nothing new starts after the window closes.
 </p>
 
+<% if (summary = @summaries.first) %>
+  <section class="window" id="summary">
+    <h2><%= summary.heading %></h2>
+    <div class="prose summary-text"><%= simple_format(summary.text) %></div>
+    <p class="hint">
+      <% if summary.sent_at %>Sent to the morning webhook <%= time_ago_in_words(summary.sent_at) %> ago.
+      <% elsif summary.error %><span class="alert-text">Not sent: <%= summary.error %></span>
+      <% elsif !Webhook.enabled? %>Kept here only: set <code>MORNING_WEBHOOK_URL</code> to have it sent (README "Overnight").
+      <% end %>
+    </p>
+    <% if @summaries.size > 1 %>
+      <details>
+        <summary>Earlier mornings</summary>
+        <% @summaries.drop(1).each do |earlier| %>
+          <h3><%= earlier.heading %></h3>
+          <div class="prose summary-text"><%= simple_format(earlier.text) %></div>
+        <% end %>
+      </details>
+    <% end %>
+  </section>
+<% end %>
+
 <section class="window" id="tonight">
   <h2>Queued for tonight</h2>
   <% if @queued_batches.empty? && @queued_trainings.empty? %>

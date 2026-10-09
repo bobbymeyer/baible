@@ -7,6 +7,7 @@
 class NightsController < ApplicationController
   def show
     @window = NightShift.window
+    @summaries = NightSummary.newest_first.limit(7).to_a
     @orders = StandingOrder.includes(:project, :kind, :entry).order(:id)
     @order = StandingOrder.new(project: Project.order(:name).first)
     @queued_batches = NightShift.queued_batches.includes(:variant, :candidates, subject: %i[project kind])

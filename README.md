@@ -51,6 +51,8 @@ what a failure usually means.
 | `LLM_TIMEOUT` | `600` | Seconds, room for the server to load the model (llama-swap unloads idle ones) |
 | `LLM_EXTRA_BODY` | `{}` | More fields for every request, as JSON. Qwen3 on llama.cpp or llama-swap: `{"chat_template_kwargs":{"enable_thinking":false}}`, or its thinking can spend the whole reply |
 | `COMFY_TRAINING_MODEL` | blank | The base model a new training set offers first: a full SDXL checkpoint (README "Training") |
+| `MORNING_WEBHOOK_URL` | blank | Where the morning summary is sent. `MORNING_WEBHOOK_FORMAT` `json` (an object with a `text` field) or `text` (ntfy); `MORNING_WEBHOOK_HEADERS` as JSON |
+| `APP_URL` | blank | baible's own address, for the link in the morning summary |
 | `ACTIVE_STORAGE_ROOT` | `storage/` | Where generated files are kept, so they can sit in a volume apart from the databases |
 
 The Settings page overrides the addresses and model names. Tokens, headers and passwords only ever
@@ -111,6 +113,9 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
    time while ComfyUI is otherwise idle, generations before training. In the morning the
    **Overnight** page has what the night made, ready to pick from. Production runs the night shift
    every minute under Solid Queue; in development, `bin/rails night:tick` runs one tick by hand.
+   When the window closes, baible writes a **morning summary** of the night (top of the Overnight
+   page) and sends it to `MORNING_WEBHOOK_URL` if set: n8n, ntfy, Slack or anything that takes a
+   POST.
    **Standing orders** (under "Every night" on that page) plan the night's work themselves: fill
    a project's gaps, keep going until each target has canon, or train an entry's LoRA once it has
    enough canon pictures. A target still waiting for review gets nothing new.
