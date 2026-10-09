@@ -6,6 +6,10 @@ ComfyUI from layered recipes, picked by a person, and handed on as files. Rails 
 This document is the design contract. Read it before writing code. Where it conflicts with a
 shortcut, the document wins until Bobby changes it.
 
+**Status.** Everything here is built except what is marked **Planned**: picks with history and
+canon (section 5, "Picks: history and canon") and the LoRA loop (section 6). Build those in that
+order: a training set is chosen from kept picks, so the history comes first.
+
 ## 1. What it is
 
 - A workshop for one person or a small team. Everyone signed in sees every project.
@@ -15,6 +19,11 @@ shortcut, the document wins until Bobby changes it.
   bible: each has lore for people and a look that every image of it carries.
 - Every asset is made the same way: a **recipe** composed in layers, a **batch** of candidates in
   ComfyUI (each its own seed), and a **pick**. The pick keeps how it was made, exactly.
+- **The loop is the point.** Words alone don't hold a character's face across kinds, poses and
+  media. So for anything that must look the same everywhere, baible makes *examples* (the entry's
+  look, a model sheet, expressions, a few kinds), a person keeps the good ones, ComfyUI trains a
+  LoRA on them, and that LoRA then makes the assets. Its output can feed the next version. The
+  entry's look and the model sheet are where this starts, not where it ends.
 - Images (any ComfyUI image model the app can recognise, see "Workflows") and audio (ACE-Step).
 - It came out of polychrome, a JRPG tabletop app, whose asset pipeline it is. polychrome is still
   its first customer: it makes polychrome's art and music. Both projects keep their own scope.
@@ -23,10 +32,13 @@ shortcut, the document wins until Bobby changes it.
 
 - Not a game, and no knowledge of any game. baible has no idea what a monster, a book or a beat
   is; polychrome's kinds are just kinds a project can have.
-- No API between baible and polychrome (or anything else). Assets leave as files (section 7).
-- No asset library or DAM features: tagging, search, collections, versions beyond the current pick.
-  An entry gathers what depicts one thing; it is not a folder or a tag.
-- No training (LoRAs come from elsewhere), no inpainting editor, no image editing.
+- No API between baible and polychrome (or anything else). Assets leave as files (section 8).
+- No asset library or DAM features: tagging, search, collections. Picks keep their history so
+  canon and training sets can be chosen from them; that is all. An entry gathers what depicts one
+  thing; it is not a folder or a tag.
+- No training code of its own. Training runs in ComfyUI's own nodes, built and queued like any
+  other workflow (section 6); a set can also leave as files for a trainer elsewhere.
+- No inpainting editor, no image editing.
 - Not multi-tenant. No per-project permissions, no sign-up page.
 
 ## 2. Data model
@@ -34,10 +46,11 @@ shortcut, the document wins until Bobby changes it.
 ```
 Project ─┬─ Kind ──────────┐            (a kind belongs to a project)
          ├─ Entry ─────────┤            (an entry belongs to a project; the bible)
-         │    └─ Note                   (a signed note on an entry)
+         │    ├─ Note                   (a signed note on an entry)
+         │    └─ Training               (Planned: one LoRA training run, from the entry's picks)
          └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry)
                 Subject / Variant ─── Batch ─── Candidate        (rounds of generation)
-                Subject / Variant ─── Pick (one per target)      (the chosen file)
+                Subject / Variant ─── Pick (one per target; Planned: a history, one current, one canon)
 SiteSetting (one row)   User ─ Session
 ```
 
@@ -52,7 +65,10 @@ SiteSetting (one row)   User ─ Session
 | `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants | `recipe` (frozen at start), `status`, `error`, `submitted_at` |
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
 | `Pick` | The chosen file for a target, and how it was made. One per target; picking again replaces it | `seed`, `prompt`, `recipe`, `run_seconds`, attached `file` |
-| `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning | see section 8 |
+| `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning | see section 7 |
+| **Planned:** `Pick` additions | Who picked it, and whether it is current or canon (section 5) | `user`, `current`, `canon_at`, `canon_by` (a user) |
+| **Planned:** `Entry` additions | The word its LoRA is trained to answer to | `trigger` |
+| **Planned:** `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6) | `entry`, `version`, `status`, `error`, `model`, `family`, `settings`, `items` (`[{ pick_id, sha256, caption }]`), `lora` (the file), `comfy_prompt_id`, `run_seconds` |
 
 - A new project starts with the kinds in `config/comfy.yml` (`kinds`) unless asked not to; each is
   editable and removable. A kind with subjects can't be removed or change medium.
@@ -146,6 +162,25 @@ at a time), with the fewest nodes that do the job:
 - **Pick** (`Candidate#pick!`): the file becomes the target's `Pick`, with its seed, prompt,
   recipe and run time; the batch (and its drafts) go.
 
+### Picks: history and canon (Planned)
+
+Today picking again replaces the target's pick, file and all. That loses approved art, and a
+training set needs more than one picture per target. So:
+
+- **Picking keeps.** A new pick becomes the target's **current** pick; the one before stays in the
+  target's history, file and recipe intact, with "Use this again". Picks record who picked them.
+- **Canon** is a deliberate mark, at most one per target: "Approve as canon" records who and when.
+  A canon pick is not replaced by picking: the new pick becomes current, canon stays, and the
+  studio shows both until someone approves the new one. Canon never blocks generating; exploring
+  is cheap, overwriting what was approved is not.
+- What stands for a target (the entry page, the project page, the manifest) is its canon pick, or
+  its current one when nothing is canon.
+- **Let go** removes one pick from the history. It is refused (`Refusal`) on a canon pick until
+  that is unapproved, and on a pick that a training run used (section 6), since that run's record
+  would point at nothing.
+- The sidecar gains `picked_by`, `canon` (boolean), `canon_by` and `canon_at`. New keys only, so it
+  stays version 1.
+
 ### Entries and model sheets
 
 - An entry's page is its page in the bible: its lore, its look, and every subject of it, kind by
@@ -171,7 +206,49 @@ at a time), with the fewest nodes that do the job:
   started from the sprite's pick with "Only the head" (`chain.head_denoise`, 0.55), then "Generate
   every variant" started from the portrait's own pick (`chain.denoise`, 0.45).
 
-## 6. Settings
+## 6. The LoRA loop (Planned)
+
+For an entry that must look the same everywhere: examples, a person's choice, a LoRA, then
+assets made with it. baible curates and records; ComfyUI trains.
+
+1. **Examples.** The entry's look gives a first, word-level consistency; the Model sheet (front,
+   both three-quarter views, full-body views), Portrait expressions and a few other kinds give the
+   variety a LoRA needs: everything varies except identity. Chains (section 5) help hold the face
+   while making them. A couple of dozen good images is the usual order of size; quality over count.
+2. **The set.** On the entry's page, a person ticks which of its image picks go in, from any of its
+   subjects and any pick in their history. Audio never does.
+3. **Captions**, one per image, written from that pick's recipe: the entry's `trigger` first, then
+   the house style, the framing, the subject and the detail, but **not the entry's look** (that is
+   what the LoRA should learn to tie to the trigger) and not the family's quality words. Each is
+   editable before the run.
+4. **The run** (`Training`, frozen at start: items, captions, base model, settings). A job uploads
+   the images into ComfyUI's input folder (`input/baible/train/<entry>-v<n>/`) and queues a
+   workflow built for that server like any other (section 4): the base model as it loads →
+   `LoadImageTextDataSetFromFolder` (or the images loader with the captions passed in) →
+   `MakeTrainingDataset` → `TrainLoraNode` → `SaveLoRA` (prefix `loras/baible/<entry>-v<n>`). A
+   missing node stops it before anything is queued, as for a batch. It is polled like a batch,
+   with its own, much longer timeout (hours). Settings (steps, rank, learning rate, batch size)
+   come from `training` in `config/comfy.yml`, per family, overridable per run.
+5. **Where it lands.** `SaveLoRA` writes into ComfyUI's *output* folder. ComfyUI must list that
+   folder as a LoRA path (`extra_model_paths.yaml`), a one-time setup the README will say how to do.
+   baible offers the LoRA only once `Comfy::Capabilities` lists it.
+6. **Using it.** When the run is done, its LoRA joins the entry's LoRAs (strength 1.0) and the
+   trigger leads the entry layer, before the look, which can then be shortened to what the LoRA
+   gets wrong. A LoRA belongs to the family it was trained on: in a recipe whose model is another
+   family it is kept but switched off, and the studio says why.
+7. **Again.** Picks made with v1 can go into v2's set. Every run stays on the entry's page with its
+   set, captions, settings, result and errors; the entry uses the version a person chooses.
+8. **Elsewhere.** "Download the training set" gives the same images and captions as a `.tar` in the
+   kohya layout (`image.png` + `image.txt`; Ruby's own `Gem::Package::TarWriter`, no gem), for a
+   trainer outside ComfyUI. A LoRA trained anywhere is a file in ComfyUI's LoRAs, and goes on the
+   entry like any other.
+
+Open, to settle against a real server before building: which families ComfyUI's training nodes
+take (Anima in particular), how captions reach the dataset node (its folder loader reads `.txt`
+beside each image, but `/upload/image` takes images only), and what a run costs in time and
+memory on the GPU baible will use.
+
+## 7. Settings
 
 `SiteSetting` (one row, the Settings page) overrides `config/comfy.yml` and `config/llm.yml`, which
 read the environment: ComfyUI's address, default image and audio models, the background-removal
@@ -181,7 +258,7 @@ environment (`COMFY_TOKEN`, `COMFY_HEADERS`, basic auth in `COMFY_URL`, `LLM_TOK
 and a URL with a password in it is refused. `ConnectionCheck` explains, step by step, why ComfyUI
 or the language model can't be reached (also `bin/rails services:check`).
 
-## 7. Export
+## 8. Export
 
 Assets leave baible as files. There is no API.
 
@@ -231,7 +308,7 @@ polychrome's base world maps onto baible's starter kinds: Creature (Bestiary), C
 Portrait (speakers; the expressions are Portrait's variants), Item, Emblem (abilities), Location,
 Scene (beats), Map, Music. Model sheet has no slot there: it's reference for baible's own use.
 
-## 8. Stack
+## 9. Stack
 
 - Omakase Rails until it is painful not to be. Rails 8.1 defaults: SQLite for everything (Solid
   Queue, Cache and Cable included), Propshaft, importmap, Hotwire, Active Storage on disk. No Node.
@@ -242,7 +319,7 @@ Scene (beats), Map, Music. Model sheet has no slot there: it's reference for bai
   over HTTP. Optionally any OpenAI-compatible language model.
 - Jobs run in Solid Queue (`bin/jobs`, or `SOLID_QUEUE_IN_PUMA`).
 
-## 9. Conventions
+## 10. Conventions
 
 - Controllers only do CRUD. A verb is a resource that hasn't been named yet: generating is
   `Subjects::BatchesController#create`, picking `Candidates::PicksController#create`, making a
