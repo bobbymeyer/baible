@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# A record made in ComfyUI (a Batch's images or audio): its way
+# A record made in ComfyUI (a Batch's images or audio, a Training's LoRA): its way
 # through, as a status, and how a job (ApplicationJob#poll_comfy) marks it
 # waiting for ComfyUI, failed, or out of time. The record says when ComfyUI
 # took it (#comfy_started_at) and how to #submit! and #collect!.
@@ -27,10 +27,13 @@ module ComfyRun
 
   def fail!(message) = update!(status: "failed", error: message.to_s.truncate(500))
 
+  # How long this kind of work gets (training takes hours).
+  def run_timeout = ComfyRun.timeout
+
   # Rendering has taken too long (counted from when ComfyUI took it: a
   # record waiting for ComfyUI to come back isn't timing out).
   def timed_out?
     started = comfy_started_at
-    started.present? && started < ComfyRun.timeout.ago
+    started.present? && started < run_timeout.ago
   end
 end

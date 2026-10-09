@@ -1,0 +1,62 @@
+<% content_for :title, "Training set · #{@entry.name}" %>
+<div class="crumbs"><%= link_to @project.name, project_path(@project) %> / <%= link_to "Bible", project_entries_path(@project) %> / <%= link_to @entry.name, entry_path(@entry) %></div>
+<h1>A training set for <%= @entry.name %></h1>
+<p class="prose">
+  Choose the pictures a LoRA should learn <%= @entry.name %> from: the same character or thing, varied in everything else (views, framing,
+  expressions, light). A couple of dozen good ones beat many weak ones. Each caption says what varies in its picture; the look
+  (<%= @entry.look.presence || "none written" %>) is left out, since that is what the LoRA should learn to tie to the trigger.
+</p>
+<% if @rows.empty? %>
+  <p class="empty">No image picks of <%= @entry.name %> yet. <%= link_to "Make some", entry_path(@entry, anchor: "make") %>: a Model sheet is a good start.</p>
+<% else %>
+  <%= form_with url: entry_trainings_path(@entry), class: "form", id: "training_form" do |f| %>
+    <div class="field-row">
+      <div class="field">
+        <%= label_tag :trigger, "Trigger" %>
+        <%= text_field_tag :trigger, @entry.trigger_or_default, required: true %>
+        <p class="hint">The word the LoRA answers to; it goes first in every caption, and in every prompt of <%= @entry.name %> while its LoRA is used. A rare word works best.</p>
+      </div>
+    </div>
+    <%= render "shared/model_field", name: "model", id: "model", value: @model, inherited: @model %>
+    <p class="hint">The base model to train on. The LoRA only works with models of its family, so use the one <%= @entry.name %>'s assets will be made with.</p>
+    <% defaults = Comfy::Family.for(@model, capabilities: Comfy.capabilities).training %>
+    <div class="field-row">
+      <% Training::SETTINGS.each do |key| %>
+        <div class="field">
+          <%= label_tag "settings_#{key}", key.humanize %>
+          <%= text_field_tag "settings[#{key}]", nil, id: "settings_#{key}", placeholder: defaults[key], inputmode: "decimal" %>
+        </div>
+      <% end %>
+    </div>
+    <p class="hint">Blank takes the model family's (config/comfy.yml <code>training</code>).</p>
+
+    <ol class="training-set">
+      <% @rows.each do |subject, variant, picks| %>
+        <% standing = subject.pick_for(variant) %>
+        <% picks.each do |pick| %>
+          <li class="training-set__item">
+            <%= hidden_field_tag "items[#{pick.id}][use]", "0", id: nil %>
+            <%= check_box_tag "items[#{pick.id}][use]", "1", pick == standing, id: "use_#{pick.id}" %>
+            <label for="use_<%= pick.id %>"><%= image_tag url_for(pick.file), alt: "#{pick.title}, seed #{pick.seed}", class: "thumb", loading: "lazy" %></label>
+            <div class="field field--wide">
+              <%= label_tag "caption_#{pick.id}" do %>
+                <strong><%= subject.kind.name %> · <%= pick.title %></strong>
+                <small class="muted">seed <%= pick.seed %><%= " · canon" if pick.canon? %><%= " · current" if pick.current? && !pick.canon? %></small>
+              <% end %>
+              <%= text_area_tag "items[#{pick.id}][caption]", Training.caption_for(pick), rows: 2, id: "caption_#{pick.id}" %>
+            </div>
+          </li>
+        <% end %>
+      <% end %>
+    </ol>
+
+    <% reachable = comfy_reachable? %>
+    <div class="actions">
+      <%= button_tag "Train in ComfyUI", name: "train", value: "1", class: "button generate", disabled: !reachable,
+                                         title: ("ComfyUI isn't answering" unless reachable) %>
+      <%= button_tag "Only keep the set", name: "train", value: "0", class: "button" %>
+      <%= link_to "Cancel", entry_path(@entry), class: "button button--quiet" %>
+    </div>
+    <p class="hint">Training takes ComfyUI for a long while (hours), and batches queued behind it wait. A kept set can be trained later, or downloaded for a trainer elsewhere.</p>
+  <% end %>
+<% end %>

@@ -1,0 +1,57 @@
+<%# An entry's training runs, newest first, and the LoRA it uses. Its own frame, which reloads as a run moves on
+    (Training#refresh_watchers, Entries::TrainingsController#index). entry. %>
+<% caps = Comfy.capabilities %>
+<%= turbo_frame_tag "trainings", data: { src: entry_trainings_path(entry) } do %>
+  <% if (using = entry.training) %>
+    <p>
+      Uses <strong><%= using.title %></strong>: <code><%= using.lora %></code>, trained on <code><%= using.model %></code>, trigger <strong><%= using.trigger %></strong>.
+      <% unless using.listed?(caps) %>
+        <br><span class="alert-text">ComfyUI doesn't list this LoRA yet: its output/loras folder must be one of its LoRA folders (README, "Training"), or move the file into models/loras.</span>
+      <% end %>
+    </p>
+    <p class="hint"><% family = Comfy::Family.find(using.family)&.label || using.family %>Every image of <%= entry.name %> made with a model of the <%= family %> family starts its layer with the trigger and this LoRA; with another family's model, the LoRA is kept in the recipe, switched off.</p>
+  <% else %>
+    <p class="hint"><%= entry.name %> uses no trained LoRA.</p>
+  <% end %>
+  <% runs = entry.trainings.includes(:user).to_a %>
+  <% if runs.any? %>
+    <table class="table trainings">
+      <thead><tr><th scope="col">Run</th><th scope="col">State</th><th scope="col">Set</th><th scope="col">Model</th><th scope="col"></th></tr></thead>
+      <tbody>
+        <% runs.each do |run| %>
+          <tr id="<%= dom_id(run) %>" class="<%= 'is-current' if run.id == entry.training_id %>">
+            <td><strong>v<%= run.version %></strong><br><small class="muted"><%= run.user&.email_address || "someone" %>, <%= time_ago_in_words(run.created_at) %> ago</small></td>
+            <td>
+              <%= { "set" => "Kept, not trained", "queued" => "Queued", "waiting" => "Waiting for ComfyUI", "running" => "Training…",
+                    "done" => "Trained", "failed" => "Failed" }.fetch(run.status) %>
+              <%= tag.small(" in #{run_time(run.run_seconds)}", class: "muted") if run.run_seconds %>
+              <% if run.error %><br><small class="alert-text"><%= run.error %></small><% end %>
+              <% if run.lora %><br><small><code><%= run.lora %></code></small><% end %>
+            </td>
+            <td><%= pluralize(run.items.size, "picture") %><br><small class="muted">trigger <%= run.trigger %></small></td>
+            <td><code><%= run.model %></code><br><small class="muted"><%= run.settings.map { |k, v| "#{k.tr('_', ' ')} #{v}" }.join(" · ") %></small></td>
+            <td class="trainings__actions">
+              <% if run.status == "done" && run.id != entry.training_id %>
+                <%= button_to "Use this LoRA", training_use_path(run), class: "link-button", form: { class: "inline" } %>
+              <% elsif run.id == entry.training_id %>
+                <%= button_to "Stop using it", training_use_path(run), method: :delete, class: "link-button", form: { class: "inline" } %>
+              <% end %>
+              <% if run.status.in?(%w[set failed]) %>
+                <%= button_to "Train in ComfyUI", training_run_path(run), class: "button generate", form: { class: "inline" },
+                              disabled: !caps.reachable?, title: ("ComfyUI isn't answering" unless caps.reachable?) %>
+              <% end %>
+              <%= link_to "Download the set (.tar)", training_set_path(run), data: { turbo: false } %>
+              <% unless run.status.in?(%w[queued waiting running]) %>
+                <%= button_to "Delete", training_path(run), method: :delete, class: "link-button",
+                              form: { class: "inline", data: { turbo_confirm: "Delete #{run.title}'s record? A LoRA ComfyUI saved stays there." } } %>
+              <% end %>
+              <details><summary>Captions</summary>
+                <ol class="captions"><% run.items.each do |item| %><li><small class="muted"><%= item["title"] %>, seed <%= item["seed"] %>:</small> <%= item["caption"] %></li><% end %></ol>
+              </details>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+<% end %>

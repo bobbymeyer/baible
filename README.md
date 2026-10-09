@@ -108,6 +108,29 @@ Every pick has **Download** (the file) and **Sidecar** (how it was made, as JSON
 HANDOFF "Export"). The project's **Manifest** lists the pick that stands for each target (canon,
 else current) with where to download each.
 
+## Training
+
+An entry's picks can train a LoRA in ComfyUI (HANDOFF "The LoRA loop"): on its page, **New training
+set**, tick the pictures, check their captions, and **Train in ComfyUI** (or keep the set, to train
+later or download as a `.tar` for another trainer). When it's done the entry uses the LoRA: every
+image of it made with a model of the same family gets the trigger and the LoRA.
+
+- ComfyUI needs its training nodes (`TrainLoraNode`, `SaveLoRA`, `LoadImageTextDataSetFromFolder`,
+  `MakeTrainingDataset`, `ResolutionBucket`): a recent ComfyUI has them. A run takes hours and
+  holds ComfyUI's queue meanwhile.
+- `SaveLoRA` saves into ComfyUI's **output** folder. To have ComfyUI (and baible) see the LoRA
+  there, add the folder to ComfyUI's LoRA folders in its `extra_model_paths.yaml` and restart it:
+
+  ```yaml
+  baible:
+      base_path: /path/to/ComfyUI/output
+      loras: loras
+  ```
+
+  Or move `output/loras/baible/<name>.safetensors` into `models/loras/baible/` by hand.
+- Settings (steps, rank, learning rate, batch size) start from `training` in `config/comfy.yml`;
+  each run can change them. They're starting points, not tuned values.
+
 ## Bringing assets into polychrome
 
 polychrome only takes uploads; there's no API between the two.

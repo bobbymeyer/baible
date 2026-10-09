@@ -34,6 +34,18 @@ shared: &shared
     denoise: 0.6
   # Give up on a batch that hasn't finished after this many seconds.
   timeout: 900
+  # Training a LoRA on an entry's picks (Comfy::Training, docs/HANDOFF.md
+  # "The LoRA loop"), with ComfyUI's own training nodes. These are starting
+  # points for a character from a couple of dozen pictures; a family can
+  # have its own (`families.<name>.training`), and each run can change them.
+  # ComfyUI runs one thing at a time: batches queued behind a run wait.
+  training:
+    steps: 1000
+    rank: 16
+    learning_rate: 0.0001
+    batch_size: 1
+    # Give up on a run after this many seconds.
+    timeout: 21600
   # Audio (Comfy::Music, an audio kind's subjects): ACE-Step, through
   # ComfyUI's own nodes (ComfyUI 0.3.34 or later), from its checkpoint in
   # models/checkpoints. A piece is described in tags ("medieval folk, lute,

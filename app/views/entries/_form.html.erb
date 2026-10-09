@@ -13,6 +13,11 @@
     <p class="hint">A LoRA trained on it, say. They stack after the kind's, before the subject's.</p>
   </div>
   <div class="field">
+    <%= f.label :trigger, "Trigger" %>
+    <%= f.text_field :trigger, placeholder: entry.name.to_s.parameterize(separator: "_").presence || "cid" %>
+    <p class="hint">The word a LoRA trained on it answers to (section "LoRA" on its page). Blank uses its name.</p>
+  </div>
+  <div class="field">
     <%= f.label :lore, "Lore" %>
     <%= f.text_area :lore, rows: 10, placeholder: "Who or what it is, where it stands in the story, what's canon. Never in a prompt." %>
   </div>

@@ -44,6 +44,12 @@ module Comfy
 
     def label = settings["label"] || slug.humanize
     def steps = settings.fetch("steps", 25).to_i
+
+    # How a LoRA is trained on it (config/comfy.yml `training`, with the
+    # family's own `training` over it): steps, rank, learning_rate, batch_size.
+    def training
+      Comfy.config.fetch(:training, {}).to_h.deep_stringify_keys.except("timeout").merge(settings.fetch("training", {}).to_h)
+    end
     def cfg = settings.fetch("cfg", 6.0).to_f
     def prefix = settings["prefix"].to_s
     def negative_prefix = settings["negative_prefix"].to_s

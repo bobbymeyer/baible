@@ -76,6 +76,7 @@ class Pick < ApplicationRecord
   # it was current, the newest pick left takes its place.
   def let_go!
     raise Refusal, "#{title}'s canon pick can't be let go: unapprove it first" if canon?
+    raise Refusal, "This pick of #{title} trained a LoRA, so it stays with that run's record" if Training.using?(self)
 
     transaction do
       destroy!

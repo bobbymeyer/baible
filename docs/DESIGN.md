@@ -25,8 +25,8 @@ The stylesheet is `app/assets/stylesheets/application.css`, taken from polychrom
 ## Colour
 
 - Type is near-black on white. Controls are grey (`--control`): links, buttons, forms, picking.
-- **Red is for Generate**, and only for it (`.generate`): the one button that spends ComfyUI's
-  time. In polychrome red marks game moves; here the "move" is generating.
+- **Red is for spending ComfyUI's time** (`.generate`): Generate, and "Train in ComfyUI". Nothing
+  else is red. In polychrome red marks game moves; here the "move" is reaching ComfyUI.
 - Alerts carry a red edge; notices an ink one.
 - Generated images and their checkerboard are content, in their own colours.
 
@@ -41,6 +41,8 @@ The stylesheet is `app/assets/stylesheets/application.css`, taken from polychrom
 | Transparency | A light checkerboard behind the image |
 | A canon pick | A heavy (3px) black frame inside the picture, and the word CANON in small caps |
 | The current pick | The word CURRENT in small caps, no frame |
+| The training run an entry uses | A small black square before its version |
+| A warning in running text (a LoRA ComfyUI can't see) | A red edge on its left, as alerts have |
 | A candidate still rendering | `…`, blinking in two steps (still, under reduced motion) |
 | Something you can't press now (Generate with ComfyUI away) | Hatched, not just greyed |
 | The current page in the masthead | A small black square before its name |
@@ -55,7 +57,8 @@ Almost none: the candidate placeholder blinks while it waits. Strips update in p
 ## Divergences
 
 - **Red for Generate, not game moves.** baible has no game; the expensive action is the one that
-  reaches ComfyUI, and that's what red marks.
+  reaches ComfyUI, and that's what red marks. "Train in ComfyUI" is red too: it spends ComfyUI's
+  time, for hours.
 - **No palette, no stage.** polychrome's fifteen-colour palette, halftones, parallelograms and
   display type are its game stage, and stay there. baible keeps the plain base it was built on.
 - **Plates without colour.** polychrome colours a plate by its subject's name so the Goblin stays

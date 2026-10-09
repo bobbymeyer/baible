@@ -72,16 +72,20 @@ class Subject < ApplicationRecord
     end
   end
 
-  # What the entry layer says: its look, for an image. Audio has no entry
-  # layer (a look isn't a sound); an audio subject joins an entry only to
-  # sit on its page.
-  def entry_prompt
-    entry && !audio? ? entry.look.to_s : ""
+  # What the entry layer says, for an image: the trigger of the LoRA it uses
+  # (when that LoRA is on for this family), then its look. Audio has no
+  # entry layer (a look isn't a sound); an audio subject joins an entry only
+  # to sit on its page.
+  def entry_prompt(family = image_family.slug)
+    entry && !audio? ? ArtDirection.join_prompt(entry.trained_trigger(family), entry.look) : ""
   end
 
-  def entry_loras
-    entry && !audio? ? entry.loras : []
+  # The entry's LoRAs: the one it trained first, then any it names.
+  def entry_loras(family = image_family.slug)
+    entry && !audio? ? [ entry.trained_lora(family), *entry.loras ].compact : []
   end
+
+  def image_family = Comfy::Family.for(model_file, capabilities: -> { Comfy.capabilities })
 
   # The layers as shown in the studio, top to bottom.
   def layers(variant = nil)
@@ -90,7 +94,10 @@ class Subject < ApplicationRecord
       top.merge("label" => project.name, "role" => "Project"),
       { "label" => kind.name, "role" => "Kind", "prompt" => kind.prompt, "model" => kind.model, "loras" => audio? ? [] : kind.loras }
     ]
-    rows << { "label" => entry.name, "role" => "Entry", "prompt" => entry_prompt, "model" => nil, "loras" => entry_loras } if entry && image?
+    if entry && image?
+      family = image_family.slug
+      rows << { "label" => entry.name, "role" => "Entry", "prompt" => entry_prompt(family), "model" => nil, "loras" => entry_loras(family) }
+    end
     rows << { "label" => name, "role" => "Subject", "prompt" => subject_prompt, "model" => model, "loras" => audio? ? [] : loras }
     rows << { "label" => variant.name, "role" => "Variant", "prompt" => variant.prompt, "loras" => [] } if variant
     rows
@@ -110,13 +117,13 @@ class Subject < ApplicationRecord
     model = model_file
     family = Comfy::Family.for(model, capabilities: -> { Comfy.capabilities })
     parts = { "prefix" => family.prefix, "style" => project.style.to_s, "framing" => kind.prompt.to_s,
-              "entry" => entry_prompt, "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
+              "entry" => entry_prompt(family.slug), "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
     width, height = family.size(kind.width, kind.height)
     {
       "medium" => "image",
       "model" => model,
       "family" => family.slug,
-      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras, loras),
+      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras(family.slug), loras),
       "positive" => ArtDirection.compose(parts),
       "negative" => family.negative? ? ArtDirection.join_prompt(family.negative_prefix, project.negative, kind.negative) : "",
       "width" => width,

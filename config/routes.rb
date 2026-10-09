@@ -19,10 +19,22 @@ Rails.application.routes.draw do
   end
 
   # An entry's page in the bible (show): its lore, its look and every
-  # subject made of it; editing it; and the notes on it.
+  # subject made of it; editing it; the notes on it; and its LoRA training
+  # sets (index: the runs alone, for their frame to reload).
   resources :entries, only: %i[show edit update destroy] do
     scope module: :entries do
       resources :notes, only: %i[create destroy]
+      resources :trainings, only: %i[index new create]
+    end
+  end
+
+  # A training run: training a kept set (run), the entry using its LoRA or
+  # not (use), its set as a .tar (set), and deleting it.
+  resources :trainings, only: :destroy do
+    scope module: :trainings do
+      resource :run, only: :create
+      resource :use, only: %i[create destroy]
+      resource :set, only: :show
     end
   end
 

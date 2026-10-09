@@ -12,7 +12,7 @@ class EntriesController < ApplicationController
   end
 
   def update
-    if @entry.update(params.expect(entry: [ :name, :look, :lore, { loras: {} } ]))
+    if @entry.update(params.expect(entry: [ :name, :look, :trigger, :lore, { loras: {} } ]))
       redirect_to entry_path(@entry), notice: "Saved.", status: :see_other
     else
       render :edit, status: :unprocessable_content

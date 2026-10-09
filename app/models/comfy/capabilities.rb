@@ -7,11 +7,13 @@
 module Comfy
   class Capabilities
     # The nodes the builder may use, the background-removal node
-    # (ComfyUI-RMBG's, Cutout), and ACE-Step's for audio (Comfy::Music).
+    # (ComfyUI-RMBG's, Cutout), ACE-Step's for audio (Comfy::Music), and
+    # ComfyUI's own for training a LoRA (Comfy::Training).
     NODES = %W[CheckpointLoaderSimple UNETLoader CLIPLoader VAELoader LoraLoader LoraLoaderModelOnly
                CLIPSetLastLayer CLIPTextEncode ConditioningZeroOut KSampler EmptyLatentImage EmptySD3LatentImage
                VAEDecode SaveImage LoadImage ImageScale VAEEncode #{Cutout::NODE}
-               EmptyAceStepLatentAudio TextEncodeAceStepAudio ModelSamplingSD3 VAEDecodeAudio SaveAudio SaveAudioMP3].freeze
+               EmptyAceStepLatentAudio TextEncodeAceStepAudio ModelSamplingSD3 VAEDecodeAudio SaveAudio SaveAudioMP3
+               LoadImageTextDataSetFromFolder MakeTrainingDataset ResolutionBucket TrainLoraNode SaveLoRA].freeze
 
     # offline: nothing answered at all (Comfy::Unreachable), rather than
     # ComfyUI answering with an error.
@@ -43,6 +45,12 @@ module Comfy
       return [] unless spec.is_a?(Array)
 
       spec.first.is_a?(Array) ? spec.first : Array(spec.dig(1, "options"))
+    end
+
+    # A node's inputs and their defaults, required ones only:
+    # { input => default or nil }.
+    def defaults(node)
+      @info.dig(node, "input", "required").to_h.transform_values { |spec| spec.is_a?(Array) && spec[1].is_a?(Hash) ? spec[1]["default"] : nil }
     end
 
     def checkpoints = options("CheckpointLoaderSimple", "ckpt_name")

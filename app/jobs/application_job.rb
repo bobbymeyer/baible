@@ -40,7 +40,7 @@ class ApplicationJob < ActiveJob::Base
     return if record.collect!(client)
 
     if record.timed_out?
-      record.fail!("ComfyUI didn't finish within #{ComfyRun.timeout.to_i / 60} minutes")
+      record.fail!("ComfyUI didn't finish within #{record.run_timeout.to_i / 60} minutes")
     else
       self.class.set(wait: COMFY_POLL).perform_later(record)
     end

@@ -6,10 +6,10 @@ ComfyUI from layered recipes, picked by a person, and handed on as files. Rails 
 This document is the design contract. Read it before writing code. Where it conflicts with a
 shortcut, the document wins until Bobby changes it.
 
-**Status.** Everything here is built except what is marked **Planned**: the LoRA loop (section 6)
-and the language model's part in running unknown models and building workflows (section 4,
-"Unknown models and new workflows"). Picks with history and canon, which the loop chooses its
-sets from, are built.
+**Status.** Everything here is built except what is marked **Planned**: the language model's part
+in running unknown models and building workflows (section 4, "Unknown models and new
+workflows"). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
+open questions are listed there.
 
 ## 1. What it is
 
@@ -51,7 +51,7 @@ sets from, are built.
 Project ─┬─ Kind ──────────┐            (a kind belongs to a project)
          ├─ Entry ─────────┤            (an entry belongs to a project; the bible)
          │    ├─ Note                   (a signed note on an entry)
-         │    └─ Training               (Planned: one LoRA training run, from the entry's picks)
+         │    └─ Training               (one LoRA training run, from the entry's picks)
          └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry)
                 Subject / Variant ─── Batch ─── Candidate        (rounds of generation)
                 Subject / Variant ─── Pick (a history per target: one current, at most one canon)
@@ -62,7 +62,7 @@ SiteSetting (one row)   User ─ Session
 | --- | --- | --- |
 | `Project` | A world or setting; the top layer | `name` (unique), `description` (never in a prompt), `style`, `negative`, `model`, `loras`, `sound` |
 | `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets` |
-| `Entry` | One thing in the world across kinds (Cid; the harbour town); the entry layer, between kind and subject | `name` (unique in its project), `look`, `loras`, `lore` (never in a prompt) |
+| `Entry` | One thing in the world across kinds (Cid; the harbour town); the entry layer, between kind and subject | `name` (unique in its project), `look`, `loras`, `lore` (never in a prompt), `trigger` (for its next LoRA), `training` (the run whose LoRA it uses) |
 | `Note` | A note on an entry: a question, a decision, a note to whoever draws it next. Never in a prompt | `entry`, `user` (null once their account goes), `body` |
 | `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
@@ -70,8 +70,7 @@ SiteSetting (one row)   User ─ Session
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
 | `Pick` | A chosen file for a target, and how it was made. Kept: a target has a history, one `current` pick and at most one canon pick (section 5) | `seed`, `prompt`, `recipe`, `run_seconds`, `user` (who picked it), `current`, `canon_at`, `canon_by` (a user), attached `file` |
 | `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning | see section 7 |
-| **Planned:** `Entry` additions | The word its LoRA is trained to answer to | `trigger` |
-| **Planned:** `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6) | `entry`, `version`, `status`, `error`, `model`, `family`, `settings`, `items` (`[{ pick_id, sha256, caption }]`), `lora` (the file), `comfy_prompt_id`, `run_seconds` |
+| `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6); "set" is a set kept without training | `entry`, `user`, `version`, `status` (`set`, then as a batch), `error`, `trigger`, `model`, `family`, `settings`, `items` (`[{ pick_id, title, seed, sha256, file, caption }]`), `lora` (the file), `workflow`, `comfy_prompt_id`, `submitted_at`, `run_seconds` |
 
 - A new project starts with the kinds in `config/comfy.yml` (`kinds`) unless asked not to; each is
   editable and removable. A kind with subjects can't be removed or change medium.
@@ -90,7 +89,7 @@ Everything ComfyUI needs apart from the seed is composed from up to five layers,
 | --- | --- | --- |
 | Project | `style`, `negative`, `model`, `loras` | `sound` |
 | Kind | `prompt` (framing), `negative`, size, `transparent`, `model`, `loras` | `prompt` (tags), `seconds`, `model` |
-| Entry, when the subject has one | `look`, `loras` | nothing |
+| Entry, when the subject has one | its LoRA's trigger, `look`; its trained LoRA, `loras` | nothing |
 | Subject | its name and `notes`, `model`, `loras` | `notes` (as tags), `lyrics`, `seconds`, `model` |
 | Variant | `prompt` | `prompt` |
 
@@ -214,8 +213,8 @@ one picture per target.
   picks a chain can start from, and a variant's seed hint. The studio shows it marked Canon or
   Current, says when a newer pick waits for approval, and lists the whole history under it.
 - **Let go** (`Pick#let_go!`) removes one pick, file and all. It is refused (`Refusal`) on a canon
-  pick until that is unapproved. When the current pick goes, the newest left becomes current.
-  (Planned with section 6: refused too on a pick a training run used.)
+  pick until that is unapproved, and on a pick a training run used (section 6), since that run's
+  record would point at nothing. When the current pick goes, the newest left becomes current.
 - Who picked and approved is kept as a user; when that account goes, the pick stays, unsigned.
 
 ### Entries and model sheets
@@ -243,47 +242,66 @@ one picture per target.
   started from the sprite's pick with "Only the head" (`chain.head_denoise`, 0.55), then "Generate
   every variant" started from the portrait's own pick (`chain.denoise`, 0.45).
 
-## 6. The LoRA loop (Planned)
+## 6. The LoRA loop
 
 For an entry that must look the same everywhere: examples, a person's choice, a LoRA, then
-assets made with it. baible curates and records; ComfyUI trains.
+assets made with it. baible curates and records; ComfyUI trains (`Training`, `TrainingJob`,
+`Comfy::Training`).
 
 1. **Examples.** The entry's look gives a first, word-level consistency; the Model sheet (front,
    both three-quarter views, full-body views), Portrait expressions and a few other kinds give the
    variety a LoRA needs: everything varies except identity. Chains (section 5) help hold the face
    while making them. A couple of dozen good images is the usual order of size; quality over count.
-2. **The set.** On the entry's page, a person ticks which of its image picks go in, from any of its
-   subjects and any pick in their history. Audio never does.
-3. **Captions**, one per image, written from that pick's recipe: the entry's `trigger` first, then
-   the house style, the framing, the subject and the detail, but **not the entry's look** (that is
-   what the LoRA should learn to tie to the trigger) and not the family's quality words. Each is
-   editable before the run.
-4. **The run** (`Training`, frozen at start: items, captions, base model, settings). A job uploads
-   the images into ComfyUI's input folder (`input/baible/train/<entry>-v<n>/`) and queues a
-   workflow built for that server like any other (section 4): the base model as it loads →
-   `LoadImageTextDataSetFromFolder` (or the images loader with the captions passed in) →
-   `MakeTrainingDataset` → `TrainLoraNode` → `SaveLoRA` (prefix `loras/baible/<entry>-v<n>`). A
-   missing node stops it before anything is queued, as for a batch. It is polled like a batch,
-   with its own, much longer timeout (hours). Settings (steps, rank, learning rate, batch size)
-   come from `training` in `config/comfy.yml`, per family, overridable per run.
-5. **Where it lands.** `SaveLoRA` writes into ComfyUI's *output* folder. ComfyUI must list that
-   folder as a LoRA path (`extra_model_paths.yaml`), a one-time setup the README will say how to do.
-   baible offers the LoRA only once `Comfy::Capabilities` lists it.
-6. **Using it.** When the run is done, its LoRA joins the entry's LoRAs (strength 1.0) and the
-   trigger leads the entry layer, before the look, which can then be shortened to what the LoRA
-   gets wrong. A LoRA belongs to the family it was trained on: in a recipe whose model is another
-   family it is kept but switched off, and the studio says why.
-7. **Again.** Picks made with v1 can go into v2's set. Every run stays on the entry's page with its
-   set, captions, settings, result and errors; the entry uses the version a person chooses.
-8. **Elsewhere.** "Download the training set" gives the same images and captions as a `.tar` in the
-   kohya layout (`image.png` + `image.txt`; Ruby's own `Gem::Package::TarWriter`, no gem), for a
-   trainer outside ComfyUI. A LoRA trained anywhere is a file in ComfyUI's LoRAs, and goes on the
-   entry like any other.
+2. **The set** ("New training set" on the entry's page, `Entries::TrainingsController#new`): every
+   image pick of every subject of the entry, history included, each target's standing pick ticked.
+   Audio never joins.
+3. **Captions** (`Training.caption_for`), one per picture, from its pick's recipe: the house style,
+   the framing, the subject (as the language model wrote it, if it did) and the detail, but **not
+   the entry's look** (that is what the LoRA should learn to tie to the trigger) and not the
+   family's quality words. Editable in the form. The run puts the **trigger** first in each: the
+   entry's `trigger`, or its name as a word (`Entry#trigger_or_default`); the one given is kept as
+   the entry's for next time.
+4. **Kept or trained.** "Only keep the set" makes a `Training` in status `set`; "Train in ComfyUI"
+   (red: it spends ComfyUI's time, for hours) also queues it, and so does training a kept or
+   failed one later (`Trainings::RunsController`). A run is frozen when made: its pictures (pick,
+   title, seed, sha256, file name), captions, trigger, base model and family, and settings
+   (`steps`, `rank`, `learning_rate`, `batch_size`: config/comfy.yml `training`, a family's own
+   `training` over it, then the form's). Versions count up per entry.
+5. **The run** (`TrainingJob`, polled like a batch through `ComfyRun`, with `training.timeout`,
+   six hours by default). It uploads each picture, **flattened on white** (`Cutout.on_white`:
+   ComfyUI's dataset loader drops alpha, and a cut-out's hidden pixels are no background to
+   learn), with its caption beside it as a `.txt`, into `input/baible/train/<stem>/` (`/upload/image`
+   stores what it's sent), then queues the graph built for that server: the base model loaded as
+   for a picture (`Comfy::Workflow.load`) → `LoadImageTextDataSetFromFolder` →
+   `MakeTrainingDataset` → `ResolutionBucket` (pictures of different shapes) → `TrainLoraNode`
+   (`bucket_mode` on; inputs baible doesn't set take the defaults ComfyUI reports) → `SaveLoRA`
+   (prefix `loras/baible/<stem>`). `<stem>` is project, entry and version:
+   `the-drowned-coast-cid-v1`. A missing node stops it before anything is queued, as for a batch.
+   It is done when ComfyUI's history says so, failed with ComfyUI's reason when it errors.
+6. **Where it lands.** `SaveLoRA` writes into ComfyUI's *output* folder,
+   `output/loras/baible/<stem>_00001_.safetensors`. ComfyUI lists it once that folder is one of
+   its LoRA folders (`extra_model_paths.yaml`, README "Training"), as `baible/<stem>_00001_.safetensors`;
+   until then the entry's page says so. A file moved into `models/loras` is found by its name.
+7. **Using it.** When a run is done the entry uses it (`Entry#training`; "Use this LoRA" and "Stop
+   using it" switch between runs). In an image recipe of its subjects the entry layer then starts
+   with the run's trigger and its LoRA leads the entry's LoRAs at 1.0 (`Entry#trained_lora`). A
+   LoRA belongs to the family it was trained on: in a recipe whose model is of another family it
+   is kept, switched off, and the trigger is left out. A subject can change its strength by naming
+   it in its own LoRAs. The look stays; shorten it to what the LoRA gets wrong.
+8. **Again.** Picks made with v1 can go into v2's set. Every run stays on the entry's page with its
+   set, captions, settings, result and error; deleting one is refused while ComfyUI has it, and
+   leaves the LoRA file on ComfyUI.
+9. **Elsewhere.** Every run, kept or trained, downloads as a `.tar` (`Trainings::SetsController`,
+   Ruby's own `Gem::Package::TarWriter`) in the kohya layout: `<stem>/1_<trigger>/001.png` with
+   `001.txt` beside it, for a trainer outside ComfyUI. A LoRA trained anywhere is a file in
+   ComfyUI's LoRAs, and goes on the entry's LoRAs like any other.
 
-Open, to settle against a real server before building: which families ComfyUI's training nodes
-take (Anima in particular), how captions reach the dataset node (its folder loader reads `.txt`
-beside each image, but `/upload/image` takes images only), and what a run costs in time and
-memory on the GPU baible will use.
+ComfyUI runs one prompt at a time: batches queued behind a run wait for it.
+
+Open, to settle against a real server: which families ComfyUI's training nodes take (Anima in
+particular), whether a folder made by upload just before queueing passes `LoadImageTextDataSetFromFolder`'s
+folder check, sensible settings per family, and what a run costs in time and memory on the GPU
+baible will use.
 
 ## 7. Settings
 

@@ -14,7 +14,7 @@ class Projects::EntriesController < ApplicationController
   end
 
   def create
-    @entry = @project.entries.new(params.expect(entry: [ :name, :look, :lore, { loras: {} } ]))
+    @entry = @project.entries.new(params.expect(entry: [ :name, :look, :trigger, :lore, { loras: {} } ]))
     if @entry.save
       redirect_to entry_path(@entry), notice: "#{@entry.name} added.", status: :see_other
     else

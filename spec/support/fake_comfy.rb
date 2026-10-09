@@ -49,9 +49,14 @@ class FakeComfy
 
   def run_seconds(id) = (42.5 if @done.include?(id))
 
-  def upload(bytes, name)
-    (@uploads ||= []) << [ name, bytes ]
-    name
+  def upload(bytes, name, subfolder: nil, content_type: "image/png")
+    (@uploads ||= []) << [ [ subfolder, name ].compact.join("/"), bytes ]
+    [ subfolder, name ].compact.join("/")
+  end
+
+  # LoRAs ComfyUI lists from now on (a training run's, once saved).
+  def add_lora(name)
+    @capabilities = FakeComfy.capabilities(loras: @capabilities.loras + [ name ])
   end
 
   def uploads = @uploads || []

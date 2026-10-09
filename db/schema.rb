@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_150000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -74,8 +74,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_140000) do
     t.text "lore"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "trigger"
+    t.integer "training_id"
     t.index ["project_id", "name"], name: "index_entries_on_project_id_and_name", unique: true
     t.index ["project_id"], name: "index_entries_on_project_id"
+    t.index ["training_id"], name: "index_entries_on_training_id"
   end
 
   create_table "kinds", force: :cascade do |t|
@@ -184,6 +187,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_140000) do
     t.index ["project_id"], name: "index_subjects_on_project_id"
   end
 
+  create_table "trainings", force: :cascade do |t|
+    t.integer "entry_id", null: false
+    t.integer "user_id"
+    t.integer "version", null: false
+    t.string "status", default: "set", null: false
+    t.text "error"
+    t.string "trigger", null: false
+    t.string "model", null: false
+    t.string "family", null: false
+    t.json "settings", default: {}, null: false
+    t.json "items", default: [], null: false
+    t.string "lora"
+    t.string "workflow"
+    t.string "comfy_prompt_id"
+    t.datetime "submitted_at"
+    t.float "run_seconds"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["entry_id", "version"], name: "index_trainings_on_entry_id_and_version", unique: true
+    t.index ["entry_id"], name: "index_trainings_on_entry_id"
+    t.index ["user_id"], name: "index_trainings_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email_address", null: false
     t.string "password_digest", null: false
@@ -209,6 +235,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_140000) do
   add_foreign_key "batches", "variants"
   add_foreign_key "candidates", "batches"
   add_foreign_key "entries", "projects"
+  add_foreign_key "entries", "trainings"
   add_foreign_key "kinds", "projects"
   add_foreign_key "notes", "entries"
   add_foreign_key "notes", "users"
@@ -220,5 +247,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_140000) do
   add_foreign_key "subjects", "entries"
   add_foreign_key "subjects", "kinds"
   add_foreign_key "subjects", "projects"
+  add_foreign_key "trainings", "entries"
+  add_foreign_key "trainings", "users"
   add_foreign_key "variants", "subjects"
 end

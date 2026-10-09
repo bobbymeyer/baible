@@ -28,6 +28,15 @@
   <p class="hint">In every image recipe of its subjects, after the kind's framing.</p>
 </section>
 
+<section class="window" id="lora">
+  <%= turbo_stream_from @entry, :trainings %>
+  <div class="page-header page-header--tight">
+    <h2>LoRA</h2>
+    <%= link_to "New training set", new_entry_training_path(@entry), class: "button button--quiet" %>
+  </div>
+  <%= render "entries/trainings", entry: @entry %>
+</section>
+
 <% by_kind = @entry.subjects_by_kind %>
 <% by_kind.each do |kind, subjects| %>
   <% subjects.each do |subject| %>
