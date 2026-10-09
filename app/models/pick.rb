@@ -57,6 +57,7 @@ class Pick < ApplicationRecord
       "medium" => medium,
       "project" => subject.project.name,
       "kind" => kind.name,
+      "entry" => subject.entry&.name,
       "subject" => subject.name,
       "variant" => variant&.name,
       "seed" => seed,

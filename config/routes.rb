@@ -7,14 +7,20 @@ Rails.application.routes.draw do
   resource :settings, only: %i[show update]
 
   # Projects, the top layer; their kinds (the middle layer, "art direction"),
-  # and making subjects in them. A project's manifest lists its picks.
+  # their entries (the bible: Cid, across every kind he's made in), and making
+  # subjects in them. A project's manifest lists its picks.
   resources :projects do
     scope module: :projects do
       resources :kinds, except: :show
+      resources :entries, only: %i[index new create]
       resources :subjects, only: %i[new create]
       resource :manifest, only: :show
     end
   end
+
+  # An entry's page in the bible (show): its lore, its look and every
+  # subject made of it; and editing it.
+  resources :entries, only: %i[show edit update destroy]
 
   # A subject's studio (show), its own layer (edit), its variants, and the
   # batches that make candidates for it; the panel is the batches alone, for

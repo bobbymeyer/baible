@@ -29,12 +29,12 @@ RSpec.describe "Exporting picks", type: :request do
     expect(response.media_type).to eq("application/json")
     expect(response.headers["Content-Disposition"]).to include("attachment", "cid-#{pick.seed}.json")
     sidecar = JSON.parse(response.body)
-    expect(sidecar.keys).to eq(%w[baible file content_type byte_size sha256 medium project kind subject variant seed prompt negative model family
+    expect(sidecar.keys).to eq(%w[baible file content_type byte_size sha256 medium project kind entry subject variant seed prompt negative model family
                                   loras width height transparent lyrics seconds source workflow run_seconds picked_at recipe])
     expect(sidecar).to include(
       "baible" => 1, "file" => "cid-#{pick.seed}.png", "content_type" => "image/png", "medium" => "image",
       "sha256" => Digest::SHA256.hexdigest(pick.file.download), "byte_size" => pick.file.byte_size,
-      "project" => "The Drowned Coast", "kind" => "Portrait", "subject" => "Cid", "variant" => nil,
+      "project" => "The Drowned Coast", "kind" => "Portrait", "entry" => nil, "subject" => "Cid", "variant" => nil,
       "seed" => pick.seed, "model" => "anima-preview.safetensors", "family" => "anima", "loras" => [],
       "width" => 1024, "height" => 1024, "transparent" => false, "lyrics" => nil, "seconds" => nil, "source" => nil, "run_seconds" => 42.5
     )

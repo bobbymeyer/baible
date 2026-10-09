@@ -4,6 +4,7 @@
 <div class="crumbs">
   <%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %> /
   <%= link_to @subject.kind.name, project_path(@project, anchor: dom_id(@subject.kind)) %>
+  <% if @subject.entry %> · of <%= link_to @subject.entry.name, entry_path(@subject.entry) %><% end %>
 </div>
 <div class="page-header">
   <h1><%= @subject.name %></h1>

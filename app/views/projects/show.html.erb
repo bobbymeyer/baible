@@ -4,6 +4,7 @@
   <h1><%= @project.name %></h1>
   <div class="actions">
     <%= link_to "House style", edit_project_path(@project), class: "button button--quiet" %>
+    <%= link_to "Bible", project_entries_path(@project), class: "button button--quiet" %>
     <%= link_to "Kinds", project_kinds_path(@project), class: "button button--quiet" %>
     <%= link_to "Download the manifest", project_manifest_path(@project), class: "button button--quiet" %>
     <%= link_to "New subject", new_project_subject_path(@project), class: "button" %>
@@ -36,7 +37,7 @@
                 <span class="plate <%= 'plate--audio' if kind.audio? %>" aria-hidden="true"><%= subject.name.first unless kind.audio? %></span>
               <% end %>
               <strong><%= subject.name %></strong>
-              <small><%= pluralize(subject.picks.size, "pick") %><%= " of #{subject.variants.size + 1}" if subject.variants.any? %></small>
+              <small><%= "#{subject.entry.name} · " if subject.entry && subject.entry.name != subject.name %><%= pluralize(subject.picks.size, "pick") %><%= " of #{subject.variants.size + 1}" if subject.variants.any? %></small>
             <% end %>
           </li>
         <% end %>

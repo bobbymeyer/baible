@@ -10,6 +10,9 @@ shortcut, the document wins until Bobby changes it.
 
 - A workshop for one person or a small team. Everyone signed in sees every project.
 - A **project** is a world or a setting. Its house style is the first layer of everything made in it.
+- An **entry** is one thing in that world across every kind it's made in: Cid, whose sprite,
+  portrait and key art are each a subject of a different kind. The entries are the project's
+  bible: each has lore for people and a look that every image of it carries.
 - Every asset is made the same way: a **recipe** composed in layers, a **batch** of candidates in
   ComfyUI (each its own seed), and a **pick**. The pick keeps how it was made, exactly.
 - Images (any ComfyUI image model the app can recognise, see "Workflows") and audio (ACE-Step).
@@ -22,6 +25,7 @@ shortcut, the document wins until Bobby changes it.
   is; polychrome's kinds are just kinds a project can have.
 - No API between baible and polychrome (or anything else). Assets leave as files (section 7).
 - No asset library or DAM features: tagging, search, collections, versions beyond the current pick.
+  An entry gathers what depicts one thing; it is not a folder or a tag.
 - No training (LoRAs come from elsewhere), no inpainting editor, no image editing.
 - Not multi-tenant. No per-project permissions, no sign-up page.
 
@@ -29,7 +33,8 @@ shortcut, the document wins until Bobby changes it.
 
 ```
 Project ─┬─ Kind ──────────┐            (a kind belongs to a project)
-         └─ Subject ───────┴─ Variant   (a subject belongs to a project and one of its kinds)
+         ├─ Entry ─────────┤            (an entry belongs to a project; the bible)
+         └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry)
                 Subject / Variant ─── Batch ─── Candidate        (rounds of generation)
                 Subject / Variant ─── Pick (one per target)      (the chosen file)
 SiteSetting (one row)   User ─ Session
@@ -39,7 +44,8 @@ SiteSetting (one row)   User ─ Session
 | --- | --- | --- |
 | `Project` | A world or setting; the top layer | `name` (unique), `description` (never in a prompt), `style`, `negative`, `model`, `loras`, `sound` |
 | `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets` |
-| `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
+| `Entry` | One thing in the world across kinds (Cid; the harbour town); the entry layer, between kind and subject | `name` (unique in its project), `look`, `loras`, `lore` (never in a prompt) |
+| `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
 | `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants | `recipe` (frozen at start), `status`, `error`, `submitted_at` |
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
@@ -49,31 +55,39 @@ SiteSetting (one row)   User ─ Session
 - A new project starts with the kinds in `config/comfy.yml` (`kinds`) unless asked not to; each is
   editable and removable. A kind with subjects can't be removed or change medium.
 - A new subject starts with its kind's `variant_presets` as variants (a portrait's expressions).
+- A subject's entry is one of its own project's. Deleting an entry keeps its subjects, unlinked.
 - JSON columns hold LoRA stacks (`[{ "name", "strength", "on" }]`, cleaned by `ArtDirection.loras`)
   and recipes.
 - Foreign keys are plain; the models clean up (`dependent:`).
 
 ## 3. The layered recipe
 
-Everything ComfyUI needs apart from the seed is composed from four layers, top to bottom
+Everything ComfyUI needs apart from the seed is composed from up to five layers, top to bottom
 (`Subject#recipe`, `Subject#layers`):
 
 | Layer | Image | Audio |
 | --- | --- | --- |
 | Project | `style`, `negative`, `model`, `loras` | `sound` |
 | Kind | `prompt` (framing), `negative`, size, `transparent`, `model`, `loras` | `prompt` (tags), `seconds`, `model` |
+| Entry, when the subject has one | `look`, `loras` | nothing |
 | Subject | its name and `notes`, `model`, `loras` | `notes` (as tags), `lyrics`, `seconds`, `model` |
 | Variant | `prompt` | `prompt` |
 
 - **Prompt:** the model family's quality words (image only), then each layer's words in order
   (`ArtDirection.compose`). The parts are kept in the recipe (`parts`) so the subject alone can be
   rewritten and the prompt put back together.
+- **The entry's look** is what stays true in every picture of it (face, build, marks, the clothes
+  it's known by). It goes in word for word, never rewritten, so the same words reach every image
+  of it whatever its kind; what it looks like in one picture (wet, wounded) belongs to the subject
+  or a variant. A look isn't a sound: audio has no entry layer, and an audio subject joins an
+  entry only to sit on its page. Recipes from before entries have no `entry` part.
 - **Negative** (image): the family's negative words, the project's, the kind's; empty when the
   family doesn't use one (CFG 1).
 - **Model:** the lowest layer that names one wins, then the default (`SiteSetting`, then
   `config/comfy.yml`). Audio skips the project (its model is an image model): subject, kind, then
   ACE-Step's checkpoint (`music.model`).
-- **LoRAs** (image) stack in layer order, project first. A lower layer naming the same LoRA changes
+- **LoRAs** (image) stack in layer order, project first (an entry's come after the kind's: a LoRA
+  trained on that character, say). A lower layer naming the same LoRA changes
   its strength in place, or switches it off. Switched-off LoRAs stay in the recipe, for the record.
 - **Size** (image) is the kind's, scaled into the family's trained range, keeping its shape.
 - **Length** (audio) is the subject's `seconds`, or the kind's.
@@ -130,6 +144,16 @@ at a time), with the fewest nodes that do the job:
 - **Pick** (`Candidate#pick!`): the file becomes the target's `Pick`, with its seed, prompt,
   recipe and run time; the batch (and its drafts) go.
 
+### Entries and model sheets
+
+- An entry's page is its page in the bible: its lore, its look, and every subject of it, kind by
+  kind, with their picks. From it, "Make Cid as…" starts a subject of any kind, of that entry.
+- The starter kinds include a **Model sheet**: a character's reference views, each its own
+  full-size picture rather than one crowded sheet. The face gets the room (front, both
+  three-quarter views, which carry what's on one side only), with a few full-body views (front,
+  side, back) for build and clothes. Expressions stay with Portrait. Laying the views out as one
+  sheet is the entry page's job, not ComfyUI's.
+
 ### Variants and chains
 
 - A variant's batch adds its words last. Its first candidate takes the seed of the subject's own
@@ -176,6 +200,7 @@ Every key is always present; what doesn't apply is `null`. `Pick#sidecar`.
 | `sha256` | string | Hex digest of the file, to match sidecar to file |
 | `medium` | string | `image` or `audio` |
 | `project`, `kind`, `subject` | string | Names, where it sits in baible |
+| `entry` | string \| null | The entry the subject depicts, or null |
 | `variant` | string \| null | The variant's name, or null for the subject itself |
 | `seed` | integer | The sampler seed |
 | `prompt` | string | The positive prompt as sent (for audio, the tags) |
@@ -199,7 +224,7 @@ polychrome takes uploads only: download the pick (and its sidecar, for the recor
 file in polychrome's own form (a book entry's image, a speaker's portrait or sprite, a track).
 polychrome's base world maps onto baible's starter kinds: Creature (Bestiary), Character sprite and
 Portrait (speakers; the expressions are Portrait's variants), Item, Emblem (abilities), Location,
-Scene (beats), Map, Music.
+Scene (beats), Map, Music. Model sheet has no slot there: it's reference for baible's own use.
 
 ## 8. Stack
 

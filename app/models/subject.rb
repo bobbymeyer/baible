@@ -4,6 +4,8 @@
 # harbour town, the harbour town's theme. Its own layer of the recipe is its
 # name and notes, a model and LoRAs (an audio subject: notes as tags,
 # lyrics and a length). Variants add a last, detail layer ("happy").
+# It may be one depiction of an entry (Cid's portrait, of Cid), whose look
+# comes before it in an image's recipe.
 #
 # A batch makes candidates for the subject itself or for one of its
 # variants (the target), and the one picked is kept, with how it was made,
@@ -11,6 +13,7 @@
 class Subject < ApplicationRecord
   belongs_to :project
   belongs_to :kind
+  belongs_to :entry, optional: true
   has_many :variants, -> { order(:position, :id) }, dependent: :destroy, inverse_of: :subject
   has_many :batches, dependent: :destroy
   has_many :picks, dependent: :destroy
@@ -19,7 +22,7 @@ class Subject < ApplicationRecord
 
   validates :name, presence: true, uniqueness: { scope: :kind_id }
   validates :seconds, numericality: { only_integer: true, in: Kind::SECONDS }, allow_nil: true
-  validate :kind_in_project
+  validate :kind_in_project, :entry_in_project
 
   after_create :add_preset_variants
 
@@ -57,14 +60,26 @@ class Subject < ApplicationRecord
     end
   end
 
+  # What the entry layer says: its look, for an image. Audio has no entry
+  # layer (a look isn't a sound); an audio subject joins an entry only to
+  # sit on its page.
+  def entry_prompt
+    entry && !audio? ? entry.look.to_s : ""
+  end
+
+  def entry_loras
+    entry && !audio? ? entry.loras : []
+  end
+
   # The layers as shown in the studio, top to bottom.
   def layers(variant = nil)
     top = audio? ? { "prompt" => project.sound, "model" => nil, "loras" => [] } : { "prompt" => project.style, "model" => project.model, "loras" => project.loras }
     rows = [
       top.merge("label" => project.name, "role" => "Project"),
-      { "label" => kind.name, "role" => "Kind", "prompt" => kind.prompt, "model" => kind.model, "loras" => audio? ? [] : kind.loras },
-      { "label" => name, "role" => "Subject", "prompt" => subject_prompt, "model" => model, "loras" => audio? ? [] : loras }
+      { "label" => kind.name, "role" => "Kind", "prompt" => kind.prompt, "model" => kind.model, "loras" => audio? ? [] : kind.loras }
     ]
+    rows << { "label" => entry.name, "role" => "Entry", "prompt" => entry_prompt, "model" => nil, "loras" => entry_loras } if entry && image?
+    rows << { "label" => name, "role" => "Subject", "prompt" => subject_prompt, "model" => model, "loras" => audio? ? [] : loras }
     rows << { "label" => variant.name, "role" => "Variant", "prompt" => variant.prompt, "loras" => [] } if variant
     rows
   end
@@ -83,13 +98,13 @@ class Subject < ApplicationRecord
     model = model_file
     family = Comfy::Family.for(model, capabilities: -> { Comfy.capabilities })
     parts = { "prefix" => family.prefix, "style" => project.style.to_s, "framing" => kind.prompt.to_s,
-              "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
+              "entry" => entry_prompt, "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
     width, height = family.size(kind.width, kind.height)
     {
       "medium" => "image",
       "model" => model,
       "family" => family.slug,
-      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, loras),
+      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras, loras),
       "positive" => ArtDirection.compose(parts),
       "negative" => family.negative? ? ArtDirection.join_prompt(family.negative_prefix, project.negative, kind.negative) : "",
       "width" => width,
@@ -131,6 +146,10 @@ class Subject < ApplicationRecord
 
   def kind_in_project
     errors.add(:kind, "must be one of the project's") if kind && project && kind.project_id != project_id
+  end
+
+  def entry_in_project
+    errors.add(:entry, "must be one of the project's") if entry && project && entry.project_id != project_id
   end
 
   def add_preset_variants

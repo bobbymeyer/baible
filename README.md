@@ -83,14 +83,20 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
 2. **Kinds** (the project's art direction): framing, negative, size, background removal, model and
    LoRAs per kind of image; tags, length and checkpoint per kind of audio; and the variants each new
    subject starts with (a Portrait's expressions).
-3. **Add a subject** to a kind: the goblin, Cid, the harbour town, the harbour's theme.
-4. **In its studio**, see the layers, write its notes (and model and LoRAs, or lyrics and length),
+3. **The bible** (optional): add an **entry** for each thing in the world that's made in more than
+   one kind, like Cid or the harbour town. Its **lore** is for people and never goes in a prompt. Its **look**
+   (and LoRAs) is the same words in every image of it, after the kind's framing. From its page,
+   "Make Cid as…" adds a subject of any kind, of that entry; the page then shows every pick of it.
+   The **Model sheet** kind makes a character's reference views (front, both three-quarters, full
+   body front, side and back), each its own picture.
+4. **Add a subject** to a kind: the goblin, Cid, the harbour town, the harbour's theme.
+5. **In its studio**, see the layers, write its notes (and model and LoRAs, or lyrics and length),
    and **Generate** for the subject, one variant, or every variant. Drafts first by default for
    images: "Make this one properly" renders the one you like at full quality from the draft.
    Candidates appear as they land, for everyone watching.
-5. **Use this** picks a candidate: it becomes the subject's (or variant's) pick, with its seed and
+6. **Use this** picks a candidate: it becomes the subject's (or variant's) pick, with its seed and
    recipe.
-6. **Chains:** a batch can start from any image pick in the project, the whole picture or only the
+7. **Chains:** a batch can start from any image pick in the project, the whole picture or only the
    head cut from a full-body figure. Sprite, then a portrait from its head, then every expression
    from the portrait: the same face throughout.
 
@@ -106,7 +112,7 @@ polychrome only takes uploads; there's no API between the two.
    its edit page, a speaker's portraits (one per expression) and sprite in their form, a track in
    the world's Music book.
 
-The starter kinds line up with polychrome's slots: Creature (Bestiary), Item (Armory), Emblem
+Apart from Model sheet, the starter kinds line up with polychrome's slots: Creature (Bestiary), Item (Armory), Emblem
 (Grimoire), Location (Gazetteer), Character sprite and Portrait (speakers; Portrait's variants are
 polychrome's expressions, the subject itself being Neutral), Scene (scene panels), Map, Music.
 
@@ -114,7 +120,7 @@ polychrome's expressions, the subject itself being Neutral), Scene (scene panels
 
 | Path | What |
 | --- | --- |
-| `app/models/project.rb`, `kind.rb`, `subject.rb`, `variant.rb` | The layers; `Subject#recipe` composes them |
+| `app/models/project.rb`, `kind.rb`, `entry.rb`, `subject.rb`, `variant.rb` | The layers; `Subject#recipe` composes them |
 | `app/models/batch.rb`, `candidate.rb`, `pick.rb`, `app/jobs/batch_job.rb` | Generating, collecting, picking; `Pick#sidecar` |
 | `app/models/comfy/`, `remote.rb`, `llm/`, `prompt_writer.rb` | ComfyUI and the language model over HTTP, workflow building |
 | `app/models/cutout.rb`, `headshot.rb` | Background removal and its mending; the head cut for chains |

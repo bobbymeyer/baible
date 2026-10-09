@@ -1,0 +1,51 @@
+<% content_for :title, "#{@entry.name} · #{@project.name}" %>
+<div class="crumbs"><%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %> / <%= link_to "Bible", project_entries_path(@project) %></div>
+<div class="page-header">
+  <h1><%= @entry.name %></h1>
+  <div class="actions"><%= link_to "Edit", edit_entry_path(@entry), class: "button button--quiet" %></div>
+</div>
+
+<section class="window" id="lore">
+  <h2>Lore</h2>
+  <% if @entry.lore %>
+    <div class="prose"><%= simple_format(@entry.lore) %></div>
+  <% else %>
+    <p class="empty">Nothing written yet. <%= link_to "Write it", edit_entry_path(@entry) %>.</p>
+  <% end %>
+</section>
+
+<section class="window" id="look">
+  <h2>Look</h2>
+  <dl class="facts">
+    <dt>Look</dt><dd><%= @entry.look.presence || tag.span("none yet", class: "muted") %></dd>
+    <dt>LoRAs</dt><dd><%= lora_stack(@entry.loras) %></dd>
+  </dl>
+  <p class="hint">In every image recipe of its subjects, after the kind's framing.</p>
+</section>
+
+<% by_kind = @entry.subjects_by_kind %>
+<% by_kind.each do |kind, subjects| %>
+  <% subjects.each do |subject| %>
+    <section class="window" id="<%= dom_id(subject) %>">
+      <div class="page-header page-header--tight">
+        <h2><span class="medium medium--<%= kind.medium %>" title="<%= kind.medium.humanize %>"></span><%= kind.name %><%= ": #{subject.name}" unless subject.name == @entry.name %></h2>
+        <%= link_to "Studio", subject_path(subject), class: "button button--quiet" %>
+      </div>
+      <%= render "subjects/picks", subject: subject %>
+    </section>
+  <% end %>
+<% end %>
+
+<section class="window" id="make">
+  <h2>Make <%= @entry.name %> as…</h2>
+  <% if @project.kinds.empty? %>
+    <p class="empty">The project has no kinds yet. <%= link_to "Add one", new_project_kind_path(@project) %>.</p>
+  <% else %>
+    <p class="actions">
+      <% @project.kinds.each do |kind| %>
+        <%= link_to kind.name, new_project_subject_path(@project, kind_id: kind.id, entry_id: @entry.id), class: "button button--quiet" %>
+      <% end %>
+    </p>
+    <p class="hint">A new subject of that kind, of <%= @entry.name %>.<%= " Already made: #{by_kind.keys.map(&:name).join(', ')}." if by_kind.any? %></p>
+  <% end %>
+</section>

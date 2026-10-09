@@ -1,0 +1,10 @@
+<% content_for :title, "#{@entry.name} · #{@project.name}" %>
+<div class="crumbs"><%= link_to @project.name, project_path(@project) %> / <%= link_to "Bible", project_entries_path(@project) %> / <%= link_to @entry.name, entry_path(@entry) %></div>
+<h1>Edit <%= @entry.name %></h1>
+<%= render "entries/form", entry: @entry, url: entry_path(@entry) %>
+<section class="window">
+  <h2>Delete <%= @entry.name %></h2>
+  <p class="hint">Its subjects and their picks stay, in their kinds, without it.</p>
+  <%= button_to "Delete #{@entry.name}", entry_path(@entry), method: :delete, class: "button button--danger",
+                form: { data: { turbo_confirm: "Delete #{@entry.name}? Its subjects stay." } } %>
+</section>

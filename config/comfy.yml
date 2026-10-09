@@ -208,6 +208,24 @@ shared: &shared
         surprised: "surprised expression, wide eyes, open mouth"
         worried: "worried expression, knitted brow"
         determined: "determined expression, set jaw"
+    # A character's reference views, each its own full-size picture (made
+    # one by one rather than as one crowded sheet): the face gets the room,
+    # both three-quarter views carry what's on one side only (a scar, a
+    # tattoo), and a few full-body views give the build and clothes.
+    - name: Model sheet
+      medium: image
+      prompt: "character reference, a single figure, even studio lighting, plain white background"
+      negative: "multiple people, cropped, text, dynamic pose"
+      width: 1024
+      height: 1024
+      transparent: false
+      variants:
+        front: "head and shoulders portrait, facing the viewer, neutral expression"
+        three-quarter left: "head and shoulders, three-quarter view, facing left, neutral expression"
+        three-quarter right: "head and shoulders, three-quarter view, facing right, neutral expression"
+        full body front: "full body, standing straight, arms at sides, front view"
+        full body side: "full body, standing straight, side view, profile"
+        full body back: "full body, standing straight, back view, from behind"
     - name: Creature
       medium: image
       prompt: "a single monster, full body, standing, profile view facing left, centered, plain white background"

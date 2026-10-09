@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_191300) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_120000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -64,6 +64,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_191300) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["batch_id"], name: "index_candidates_on_batch_id"
+  end
+
+  create_table "entries", force: :cascade do |t|
+    t.integer "project_id", null: false
+    t.string "name", null: false
+    t.text "look"
+    t.json "loras", default: [], null: false
+    t.text "lore"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id", "name"], name: "index_entries_on_project_id_and_name", unique: true
+    t.index ["project_id"], name: "index_entries_on_project_id"
   end
 
   create_table "kinds", force: :cascade do |t|
@@ -148,6 +160,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_191300) do
     t.integer "seconds"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "entry_id"
+    t.index ["entry_id"], name: "index_subjects_on_entry_id"
     t.index ["kind_id", "name"], name: "index_subjects_on_kind_id_and_name", unique: true
     t.index ["kind_id"], name: "index_subjects_on_kind_id"
     t.index ["project_id"], name: "index_subjects_on_project_id"
@@ -177,10 +191,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_191300) do
   add_foreign_key "batches", "subjects"
   add_foreign_key "batches", "variants"
   add_foreign_key "candidates", "batches"
+  add_foreign_key "entries", "projects"
   add_foreign_key "kinds", "projects"
   add_foreign_key "picks", "subjects"
   add_foreign_key "picks", "variants"
   add_foreign_key "sessions", "users"
+  add_foreign_key "subjects", "entries"
   add_foreign_key "subjects", "kinds"
   add_foreign_key "subjects", "projects"
   add_foreign_key "variants", "subjects"
