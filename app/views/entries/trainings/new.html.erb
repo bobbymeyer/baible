@@ -56,9 +56,23 @@
       <% end %>
     </ol>
 
-    <% reachable = comfy_reachable? %>
+    <% if Comfy.training_host? %>
+      <fieldset class="panel">
+        <legend>Train on</legend>
+        <div class="field field--check">
+          <%= radio_button_tag :host, "remote", true %>
+          <%= label_tag :host_remote, "The training host (#{URI(Comfy.training_host[:url]).host rescue 'TRAINING_COMFY_URL'})#{', started and stopped on RunPod' if RunPod.enabled?}" %>
+        </div>
+        <div class="field field--check">
+          <%= radio_button_tag :host, "local" %>
+          <%= label_tag :host_local, "This ComfyUI" %>
+        </div>
+        <p class="hint">The training host trains beside this ComfyUI, which goes on generating. It needs the base model and ComfyUI's training nodes; the LoRA comes back here when it's done.</p>
+      </fieldset>
+    <% end %>
+    <% reachable = comfy_reachable? || Comfy.training_host? %>
     <div class="actions">
-      <%= button_tag "Train in ComfyUI", name: "train", value: "1", class: "button generate", disabled: !reachable,
+      <%= button_tag "Train now", name: "train", value: "1", class: "button generate", disabled: !reachable,
                                          title: ("ComfyUI isn't answering" unless reachable) %>
       <%= button_tag "Train tonight", name: "train", value: "tonight", class: "button" %>
       <%= button_tag "Only keep the set", name: "train", value: "0", class: "button button--quiet" %>

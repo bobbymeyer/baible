@@ -8,8 +8,9 @@ shortcut, the document wins until Bobby changes it.
 
 **Status.** Everything here is built except what is marked **Planned**: the language model's part
 in running unknown models and building workflows (section 4, "Unknown models and new
-workflows"), and training on a rented GPU (section 7). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
-open questions are listed there.
+workflows"). The LoRA loop (section 6), its training hosts and the night shift (section 7) are
+built but not yet tried against a real ComfyUI or a rented GPU; their open questions are listed
+where they are described.
 
 ## 1. What it is
 
@@ -72,7 +73,7 @@ SiteSetting (one row)   User ─ Session
 | `Pick` | A chosen file for a target, and how it was made. Kept: a target has a history, one `current` pick and at most one canon pick (section 5) | `seed`, `prompt`, `recipe`, `run_seconds`, `user` (who picked it), `current`, `canon_at`, `canon_by` (a user), attached `file` |
 | `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning, the night window | see sections 7 and 8 |
 | `NightSummary` | One night's summary, written when the window closes (section 7) | `opened_at`, `closed_at` (unique), `text`, `payload`, `sent_at`, `error` |
-| `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6); "set" is a set kept without training, "scheduled" one to train tonight (section 7) | `entry`, `user`, `version`, `status` (`set`, `scheduled`, then as a batch), `error`, `trigger`, `model`, `family`, `settings`, `items` (`[{ pick_id, title, seed, sha256, file, caption }]`), `lora` (the file), `workflow`, `comfy_prompt_id`, `submitted_at`, `run_seconds` |
+| `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6); "set" is a set kept without training, "scheduled" one to train tonight (section 7) | `entry`, `user`, `version`, `status` (`set`, `scheduled`, then as a batch), `error`, `trigger`, `model`, `family`, `settings`, `items` (`[{ pick_id, title, seed, sha256, file, caption }]`), `lora` (the name ComfyUI knows it by), attached `lora_file`, `host` (`local`, `remote`), `host_started_at`, `host_note`, `workflow`, `comfy_prompt_id`, `submitted_at`, `run_seconds` |
 
 - A new project starts with the kinds in `config/comfy.yml` (`kinds`) unless asked not to; each is
   editable and removable. A kind with subjects can't be removed or change medium.
@@ -287,10 +288,16 @@ assets made with it. baible curates and records; ComfyUI trains (`Training`, `Tr
    (prefix `loras/baible/<stem>`). `<stem>` is project, entry and version:
    `the-drowned-coast-cid-v1`. A missing node stops it before anything is queued, as for a batch.
    It is done when ComfyUI's history says so, failed with ComfyUI's reason when it errors.
-6. **Where it lands.** `SaveLoRA` writes into ComfyUI's *output* folder,
-   `output/loras/baible/<stem>_00001_.safetensors`. ComfyUI lists it once that folder is one of
-   its LoRA folders (`extra_model_paths.yaml`, README "Training"), as `baible/<stem>_00001_.safetensors`;
-   until then the entry's page says so. A file moved into `models/loras` is found by its name.
+6. **Where it lands.** `SaveLoRA` writes into the training ComfyUI's *output* folder,
+   `output/loras/baible/<stem>_00001_.safetensors`. When the run is done baible fetches it back
+   through `/view` (`Training#fetch_lora`, trying the counter up to 5) and keeps it (`lora_file`,
+   "Download the LoRA" on the run). When `TRAINED_LORA_DIR` is one of this ComfyUI's LoRA folders
+   mounted into baible (config/comfy.yml `trained_loras`), baible writes it there as
+   `<stem>.safetensors`, and ComfyUI knows it as `<prefix>/<stem>.safetensors`
+   (`TRAINED_LORA_PREFIX`, `baible`). Without that folder, a run trained here goes by its name in
+   ComfyUI's outputs (listed once `output/loras` is one of its LoRA folders,
+   `extra_model_paths.yaml`), and one trained elsewhere by the name it would have once put in
+   `loras/baible`; the entry's page says when ComfyUI can't see it yet, with the download.
 7. **Using it.** When a run is done the entry uses it (`Entry#training`; "Use this LoRA" and "Stop
    using it" switch between runs). In an image recipe of its subjects the entry layer then starts
    with the run's trigger and its LoRA leads the entry's LoRAs at 1.0 (`Entry#trained_lora`). A
@@ -339,7 +346,36 @@ made unattended, for review in the morning (`NightShift`, `NightShiftJob`, `Nigh
   tonight" to take a batch or run off it, and what the night made: its batches still waiting for a
   pick (the studio's strips, Use this included), and training runs that finished or failed in the
   last day.
-- **Planned, not built:** training on a rented GPU from the same queue.
+
+### Training hosts
+
+A second ComfyUI to train on (`training_host` in config/comfy.yml: `TRAINING_COMFY_URL`, with
+`TRAINING_COMFY_TOKEN` and `TRAINING_COMFY_HEADERS` in the environment only): a rented GPU, or a
+GPU box on the tailnet. This ComfyUI then goes on generating while it trains.
+
+- A run is made for one host (`Training#host`, `local` or `remote`) and keeps it: the training host
+  by default when one is set, else here; the training form offers both. Its job talks to that
+  ComfyUI (`Comfy.client_for`) with the same graph, uploads and polling as a local run. The host
+  needs ComfyUI's training nodes and the base model under the same file name. A remote run whose
+  host has since gone from the configuration fails with that reason.
+- **RunPod**, when `RUNPOD_API_KEY` (environment only) and `training_host.runpod_pod_id`
+  (`RUNPOD_POD_ID`) are set: the pod is started before the run (`POST
+  rest.runpod.io/v1/pods/{id}/start`, `RunPod.start!`) and stopped after it, done or failed
+  (`/stop`), so it costs only while it trains. A stopped pod keeps its volume, so ComfyUI, its
+  nodes and the base models stay on it between runs. For `training_host.boot_minutes` (20) after
+  the start, a ComfyUI that isn't up yet (RunPod's proxy answering 502) is waited for rather than
+  failed. RunPod refusing (a wrong key or pod) fails the run with its reason. **A pod that wouldn't
+  stop is said loudly**: `host_note` on the run, its page, and the first line of the morning summary
+  ("NEEDS YOU"), since it costs money until someone stops it.
+- **The night shift** gives the host its own track: a scheduled remote run goes as soon as the host
+  has nothing of baible's, without waiting for this ComfyUI's generations, which don't wait for it.
+  One run at a time on the host.
+- The pod's ComfyUI is unauthenticated behind RunPod's proxy address, which is the only thing
+  keeping it private: the same posture as ComfyUI on the tailnet, on a machine someone else owns.
+  baible stops it when it isn't training; keep nothing on it you'd mind losing.
+- Open, to settle against RunPod: how long a stopped pod takes to bring ComfyUI back (the boot
+  window), what an SDXL character LoRA costs there, and whether uploading a set through the proxy is
+  reliable.
 
 ### The morning summary
 

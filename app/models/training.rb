@@ -19,12 +19,17 @@ class Training < ApplicationRecord
   STATUSES = [ "set", "scheduled", *ComfyRun::STATUSES ].freeze
   SETTINGS = %w[steps rank learning_rate batch_size].freeze
 
+  HOSTS = %w[local remote].freeze
+
   belongs_to :entry
   belongs_to :user, optional: true
+  # The LoRA, fetched back from the ComfyUI that trained it.
+  has_one_attached :lora_file
 
   normalizes :trigger, with: ->(value) { value.to_s.squish.presence }
 
   validates :status, inclusion: { in: STATUSES }
+  validates :host, inclusion: { in: HOSTS }
   validates :trigger, :model, :family, presence: true
   validates :version, uniqueness: { scope: :entry_id }
   validate :has_items
@@ -46,8 +51,11 @@ class Training < ApplicationRecord
 
   # A new set for an entry. rows: [{ pick:, caption: }] in order; captions
   # are kept as written, the trigger put first. train: :now to queue it,
-  # :tonight to schedule it for the night window, nil to keep it.
-  def self.start!(entry, rows, trigger:, model:, settings:, user:, train:)
+  # :tonight to schedule it for the night window, nil to keep it. host:
+  # "remote" for the training host, "local" for this ComfyUI; by default
+  # the training host when there is one.
+  def self.start!(entry, rows, trigger:, model:, settings:, user:, train:, host: nil)
+    host = host.presence_in(HOSTS) || (Comfy.training_host? ? "remote" : "local")
     family = Comfy::Family.for(model, capabilities: -> { Comfy.capabilities })
     settings = family.training.merge(settings.to_h.stringify_keys.slice(*SETTINGS).compact_blank)
                          .to_h { |key, value| [ key, key == "learning_rate" ? value.to_f : value.to_i ] }
@@ -59,7 +67,7 @@ class Training < ApplicationRecord
     training = transaction do
       entry.update!(trigger: trigger)
       entry.trainings.create!(version: entry.trainings.maximum(:version).to_i + 1, trigger: trigger, model: model, family: family.slug,
-                              settings: settings, items: items, user: user, status: "set")
+                              settings: settings, items: items, user: user, status: "set", host: host)
     end
     case train
     when :now then training.train!
@@ -78,7 +86,8 @@ class Training < ApplicationRecord
   def train!
     raise Refusal, "Only a kept set or a failed run can be trained" unless status.in?(%w[set failed scheduled])
 
-    update!(status: "queued", error: nil, comfy_prompt_id: nil, submitted_at: nil, lora: nil, workflow: nil)
+    update!(status: "queued", error: nil, comfy_prompt_id: nil, submitted_at: nil, lora: nil, workflow: nil,
+            host_started_at: nil, host_note: nil)
     TrainingJob.perform_later(self)
   end
 
@@ -96,6 +105,50 @@ class Training < ApplicationRecord
   end
 
   def title = "#{entry.name} v#{version}"
+
+  def remote? = host == "remote"
+
+  # The ComfyUI it trains on (Comfy.client_for).
+  def client = Comfy.client_for(host)
+
+  # --- the training host -------------------------------------------------
+
+  # A rented pod (RunPod), started once for the run. A refusal from RunPod
+  # (a wrong key or pod) fails the run with its reason; RunPod out of reach
+  # is waited for, as ComfyUI is.
+  def start_host!
+    return unless remote? && RunPod.enabled? && host_started_at.nil?
+
+    RunPod.start!
+    update!(host_started_at: Time.current)
+  rescue RunPod::Unreachable => e
+    raise Comfy::Unreachable, e.message
+  rescue RunPod::Error => e
+    raise Comfy::Error, "RunPod wouldn't start the pod: #{e.message}"
+  end
+
+  # Stop the pod it started, whatever became of the run. A pod left running
+  # costs money, so not stopping it is said loudly (host_note, the morning
+  # summary) rather than raised.
+  def stop_host!
+    return unless remote? && host_started_at && RunPod.enabled?
+
+    RunPod.stop!
+    update!(host_started_at: nil)
+  rescue RunPod::Error => e
+    update!(host_note: "RunPod didn't stop pod #{RunPod.pod_id} (#{e.message}): stop it by hand, it's costing money.")
+  end
+
+  # Still booting: a pod started a few minutes ago whose ComfyUI isn't up
+  # yet answers through RunPod's proxy with errors, which mean "wait" here.
+  def booting?
+    remote? && host_started_at.present? && host_started_at > Comfy.training_host.fetch(:boot_minutes, 20).to_i.minutes.ago
+  end
+
+  def fail!(message)
+    super
+    stop_host!
+  end
 
   # The LoRAs it is one of (Comfy::Family#lora_pool), from its base model.
   def lora_pool = Comfy::Family.new(family, model).lora_pool
@@ -133,12 +186,18 @@ class Training < ApplicationRecord
     end
   end
 
+  # Upload the set and queue the graph, once ComfyUI answers.
   def submit!(client)
     capabilities = client.capabilities
     unless capabilities.reachable?
-      raise (capabilities.offline? ? Comfy::Unreachable : Comfy::Error), capabilities.error || "ComfyUI isn't answering"
+      if capabilities.offline? || booting?
+        raise Comfy::Unreachable, "#{remote? ? 'The training host' : 'ComfyUI'} isn't up yet: #{capabilities.error}"
+      end
+
+      raise Comfy::Error, capabilities.error || "ComfyUI isn't answering"
     end
 
+    upload_set!(client)
     graph = Comfy::Training.build(model: model, family: family, folder: folder, prefix: prefix, settings: settings,
                                   seed: Random.rand(2**31), capabilities: capabilities)
     update!(workflow: Comfy::Workflow.outline(graph), comfy_prompt_id: client.submit(graph), status: "running", error: nil,
@@ -146,17 +205,56 @@ class Training < ApplicationRecord
   end
 
   # Done once ComfyUI's history says so (SaveLoRA saves nothing it lists);
-  # an error there fails it (ApplicationJob#poll_comfy). The entry then uses
-  # its LoRA, as ComfyUI lists it, or as it will once it can see it.
+  # an error there fails it (ApplicationJob#poll_comfy). The LoRA is fetched
+  # back from that ComfyUI's outputs and kept (lora_file), put where this
+  # ComfyUI reads LoRAs when baible can (config/comfy.yml `trained_loras`),
+  # and the entry then uses it. The pod, if one was started, is stopped.
   def collect!(client)
     return false if client.result(comfy_prompt_id).nil?
 
-    listed = client.capabilities.loras.find { |file| File.basename(file).start_with?("#{stem}_") }
+    bytes = fetch_lora(client)
+    lora_file.attach(io: StringIO.new(bytes), filename: "#{stem}.safetensors", content_type: "application/octet-stream", identify: false) if bytes
+    name = (bytes && install(bytes)) || (remote? ? installed_name : local_name(client))
     transaction do
-      update!(status: "done", lora: listed || expected_lora, run_seconds: client.run_seconds(comfy_prompt_id))
+      update!(status: "done", lora: name, run_seconds: client.run_seconds(comfy_prompt_id))
       entry.update!(training: self)
     end
+    stop_host!
     true
+  end
+
+  # The LoRA file from the ComfyUI that trained it, by SaveLoRA's naming
+  # (<stem>_00001_.safetensors, the counter higher if the name was taken),
+  # or nil when it can't be had (an older ComfyUI, a file moved away).
+  def fetch_lora(client)
+    (1..5).each do |n|
+      return client.fetch("filename" => format("%s_%05d_.safetensors", stem, n), "subfolder" => "loras/baible", "type" => "output")
+    rescue Comfy::Unreachable
+      raise
+    rescue Comfy::Error
+      next
+    end
+    nil
+  end
+
+  # What this ComfyUI calls a LoRA baible put in its folder.
+  def installed_name = "#{Comfy.config.dig(:trained_loras, :prefix).presence || 'baible'}/#{stem}.safetensors"
+
+  # Into this ComfyUI's LoRAs, when baible has that folder. The name, or nil.
+  def install(bytes)
+    dir = Comfy.config.dig(:trained_loras, :dir).presence or return
+    FileUtils.mkdir_p(dir)
+    File.binwrite(File.join(dir, "#{stem}.safetensors"), bytes)
+    installed_name
+  rescue SystemCallError => e
+    update!(host_note: "Couldn't put the LoRA in #{dir} (#{e.message}): download it from this run instead.")
+    nil
+  end
+
+  # Trained here and not installed: as this ComfyUI lists it in its outputs
+  # (README "Training"), or will.
+  def local_name(client)
+    client.capabilities.loras.find { |file| File.basename(file).start_with?("#{stem}_") } || expected_lora
   end
 
   # Whether ComfyUI lists its LoRA, for the pages.

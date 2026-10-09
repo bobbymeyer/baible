@@ -5,8 +5,8 @@
   <% if (using = entry.training) %>
     <p>
       Uses <strong><%= using.title %></strong>: <code><%= using.lora %></code>, trained on <code><%= using.model %></code>, trigger <strong><%= using.trigger %></strong>.
-      <% unless using.listed?(caps) %>
-        <br><span class="alert-text">ComfyUI doesn't list this LoRA yet: its output/loras folder must be one of its LoRA folders (README, "Training"), or move the file into models/loras.</span>
+      <% unless using.listed?(caps) || !caps.reachable? %>
+        <br><span class="alert-text">ComfyUI doesn't list this LoRA yet. Mount one of its LoRA folders into baible as <code>TRAINED_LORA_DIR</code> and baible puts trained LoRAs there itself (README, "Training"); until then, <%= using.lora_file.attached? ? link_to("download it", training_lora_path(using), data: { turbo: false }) : "find it in the training ComfyUI's output/loras/baible" %> and put it in <code><%= using.lora %></code> under ComfyUI's models/loras.</span>
       <% end %>
     </p>
     <p class="hint"><% family = Comfy::Family.new(using.family, using.model).label %>Every image of <%= entry.name %> made with a model that takes <%= family %> LoRAs starts its layer with the trigger and this LoRA; with any other model, the LoRA is kept in the recipe, switched off.</p>
@@ -26,7 +26,9 @@
                     "done" => "Trained", "failed" => "Failed" }.fetch(run.status) %>
               <%= tag.small(" in #{run_time(run.run_seconds)}", class: "muted") if run.run_seconds %>
               <% if run.error %><br><small class="alert-text"><%= run.error %></small><% end %>
+              <% if run.host_note %><br><small class="alert-text"><%= run.host_note %></small><% end %>
               <% if run.lora %><br><small><code><%= run.lora %></code></small><% end %>
+              <% if run.remote? %><br><small class="muted">on the training host</small><% end %>
             </td>
             <td><%= pluralize(run.items.size, "picture") %><br><small class="muted">trigger <%= run.trigger %></small></td>
             <td><code><%= run.model %></code><br><small class="muted"><%= run.settings.map { |k, v| "#{k.tr('_', ' ')} #{v}" }.join(" · ") %></small></td>
@@ -37,13 +39,15 @@
                 <%= button_to "Stop using it", training_use_path(run), method: :delete, class: "link-button", form: { class: "inline" } %>
               <% end %>
               <% if run.status.in?(%w[set failed]) %>
-                <%= button_to "Train in ComfyUI", training_run_path(run), class: "button generate", form: { class: "inline" },
-                              disabled: !caps.reachable?, title: ("ComfyUI isn't answering" unless caps.reachable?) %>
+                <% can = run.remote? ? Comfy.training_host? : caps.reachable? %>
+                <%= button_to "Train now", training_run_path(run), class: "button generate", form: { class: "inline" },
+                              disabled: !can, title: ("#{run.remote? ? 'No training host is set' : "ComfyUI isn't answering"}" unless can) %>
                 <%= button_to "Train tonight", training_run_path(run, tonight: 1), class: "link-button", form: { class: "inline" } %>
               <% elsif run.status == "scheduled" %>
                 <%= button_to "Not tonight", training_run_path(run), method: :delete, class: "link-button", form: { class: "inline" } %>
               <% end %>
               <%= link_to "Download the set (.tar)", training_set_path(run), data: { turbo: false } %>
+              <% if run.lora_file.attached? %><%= link_to "Download the LoRA", training_lora_path(run), data: { turbo: false } %><% end %>
               <% unless run.status.in?(%w[scheduled queued waiting running]) %>
                 <%= button_to "Delete", training_path(run), method: :delete, class: "link-button",
                               form: { class: "inline", data: { turbo_confirm: "Delete #{run.title}'s record? A LoRA ComfyUI saved stays there." } } %>

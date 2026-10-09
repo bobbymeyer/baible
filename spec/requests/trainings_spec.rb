@@ -164,6 +164,23 @@ RSpec.describe "Training a LoRA on an entry", type: :request do
     expect(page.at("input#model, select#model")["value"] || page.at("select#model option[selected]")&.text).to eq("sdxl_base_1.0.safetensors")
   end
 
+  it "offers the training host when there is one, and keeps the run where it was asked to train" do
+    face = pick_one(portrait)
+    allow(Comfy).to receive(:config).and_wrap_original do |original|
+      original.call.merge(training_host: { url: "https://gpu.example:8188" })
+    end
+    get new_entry_training_path(cid)
+    expect(page.at("#training_form fieldset").text).to include("The training host (gpu.example)", "This ComfyUI")
+    expect(page.at("input#host_remote")["checked"]).to be_present
+
+    train([ face ], train: "0", host: "local")
+    expect(cid.trainings.first.host).to eq("local")
+    train([ face ], train: "0")
+    expect(cid.trainings.first.host).to eq("remote")
+    get entry_path(cid)
+    expect(page.at("#trainings").text).to include("on the training host")
+  end
+
   it "warns against training on a distilled model" do
     pick_one(portrait)
     allow(Comfy).to receive(:config).and_wrap_original do |original|

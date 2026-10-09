@@ -51,6 +51,9 @@ what a failure usually means.
 | `LLM_TIMEOUT` | `600` | Seconds, room for the server to load the model (llama-swap unloads idle ones) |
 | `LLM_EXTRA_BODY` | `{}` | More fields for every request, as JSON. Qwen3 on llama.cpp or llama-swap: `{"chat_template_kwargs":{"enable_thinking":false}}`, or its thinking can spend the whole reply |
 | `COMFY_TRAINING_MODEL` | blank | The base model a new training set offers first: a full SDXL checkpoint (README "Training") |
+| `TRAINING_COMFY_URL` | blank | A second ComfyUI to train LoRAs on: a rented GPU, a GPU box on the tailnet (README "Training"). `TRAINING_COMFY_TOKEN` and `TRAINING_COMFY_HEADERS` as for ComfyUI |
+| `RUNPOD_API_KEY`, `RUNPOD_POD_ID` | blank | Start that RunPod pod before a run and stop it after |
+| `TRAINED_LORA_DIR` | blank | One of ComfyUI's LoRA folders, mounted into baible: trained LoRAs are put there. `TRAINED_LORA_PREFIX` (`baible`) is that folder's name to ComfyUI |
 | `MORNING_WEBHOOK_URL` | blank | Where the morning summary is sent. `MORNING_WEBHOOK_FORMAT` `json` (an object with a `text` field) or `text` (ntfy); `MORNING_WEBHOOK_HEADERS` as JSON |
 | `APP_URL` | blank | baible's own address, for the link in the morning summary |
 | `ACTIVE_STORAGE_ROOT` | `storage/` | Where generated files are kept, so they can sit in a volume apart from the databases |
@@ -134,8 +137,16 @@ image of it made with a model of the same family gets the trigger and the LoRA.
 - ComfyUI needs its training nodes (`TrainLoraNode`, `SaveLoRA`, `LoadImageTextDataSetFromFolder`,
   `MakeTrainingDataset`, `ResolutionBucket`): a recent ComfyUI has them. A run takes hours and
   holds ComfyUI's queue meanwhile.
-- `SaveLoRA` saves into ComfyUI's **output** folder. To have ComfyUI (and baible) see the LoRA
-  there, add the folder to ComfyUI's LoRA folders in its `extra_model_paths.yaml` and restart it:
+- **Train on a rented GPU** (or another machine) by setting `TRAINING_COMFY_URL` to its ComfyUI.
+  The training form then offers it, and it trains while this ComfyUI goes on generating. On
+  RunPod, set `RUNPOD_API_KEY` and `RUNPOD_POD_ID` too and baible starts the pod for each run and
+  stops it afterwards, so you pay only while it trains. Keep ComfyUI, its training nodes and the
+  base model on the pod's volume; its ComfyUI is at `https://<pod id>-8188.proxy.runpod.net`. If
+  baible ever can't stop the pod, the run's page and the morning summary say so first.
+- **The LoRA comes back by itself.** baible fetches every trained LoRA from the ComfyUI that made
+  it ("Download the LoRA" on the run). Mount one of your ComfyUI's LoRA folders into baible as
+  `TRAINED_LORA_DIR` and baible puts it there, ready to use. Without that, `SaveLoRA`'s output
+  folder can be made one of ComfyUI's LoRA folders in its `extra_model_paths.yaml`:
 
   ```yaml
   baible:

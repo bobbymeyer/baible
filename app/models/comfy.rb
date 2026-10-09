@@ -19,6 +19,21 @@ module Comfy
     Client.new(timeout: timeout)
   end
 
+  # The training host (config/comfy.yml `training_host`), when there is one.
+  def self.training_host = config.fetch(:training_host, {}).to_h.symbolize_keys
+
+  def self.training_host? = training_host[:url].present?
+
+  # The ComfyUI a run trains on: the training host for a remote run, else
+  # this one.
+  def self.client_for(host, timeout: 30)
+    return client(timeout: timeout) unless host == "remote"
+
+    raise Error, "No training host is set (TRAINING_COMFY_URL)" unless training_host?
+
+    Client.new(url: training_host[:url], token: training_host[:token], headers: training_host[:headers], timeout: timeout)
+  end
+
   # What ComfyUI has installed, for the pickers and the workflow preview.
   # Remembered for a minute when ComfyUI answers; when it doesn't, only for
   # a few seconds, so starting it shows up on the next reload.

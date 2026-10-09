@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -243,6 +243,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_090000) do
     t.float "run_seconds"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "host", default: "local", null: false
+    t.datetime "host_started_at"
+    t.text "host_note"
     t.index ["entry_id", "version"], name: "index_trainings_on_entry_id_and_version", unique: true
     t.index ["entry_id"], name: "index_trainings_on_entry_id"
     t.index ["user_id"], name: "index_trainings_on_user_id"
