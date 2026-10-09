@@ -22,7 +22,7 @@
           <tr id="<%= dom_id(run) %>" class="<%= 'is-current' if run.id == entry.training_id %>">
             <td><strong>v<%= run.version %></strong><br><small class="muted"><%= run.user&.email_address || "someone" %>, <%= time_ago_in_words(run.created_at) %> ago</small></td>
             <td>
-              <%= { "set" => "Kept, not trained", "queued" => "Queued", "waiting" => "Waiting for ComfyUI", "running" => "Training…",
+              <%= { "set" => "Kept, not trained", "scheduled" => "Training tonight", "queued" => "Queued", "waiting" => "Waiting for ComfyUI", "running" => "Training…",
                     "done" => "Trained", "failed" => "Failed" }.fetch(run.status) %>
               <%= tag.small(" in #{run_time(run.run_seconds)}", class: "muted") if run.run_seconds %>
               <% if run.error %><br><small class="alert-text"><%= run.error %></small><% end %>
@@ -39,9 +39,12 @@
               <% if run.status.in?(%w[set failed]) %>
                 <%= button_to "Train in ComfyUI", training_run_path(run), class: "button generate", form: { class: "inline" },
                               disabled: !caps.reachable?, title: ("ComfyUI isn't answering" unless caps.reachable?) %>
+                <%= button_to "Train tonight", training_run_path(run, tonight: 1), class: "link-button", form: { class: "inline" } %>
+              <% elsif run.status == "scheduled" %>
+                <%= button_to "Not tonight", training_run_path(run), method: :delete, class: "link-button", form: { class: "inline" } %>
               <% end %>
               <%= link_to "Download the set (.tar)", training_set_path(run), data: { turbo: false } %>
-              <% unless run.status.in?(%w[queued waiting running]) %>
+              <% unless run.status.in?(%w[scheduled queued waiting running]) %>
                 <%= button_to "Delete", training_path(run), method: :delete, class: "link-button",
                               form: { class: "inline", data: { turbo_confirm: "Delete #{run.title}'s record? A LoRA ComfyUI saved stays there." } } %>
               <% end %>

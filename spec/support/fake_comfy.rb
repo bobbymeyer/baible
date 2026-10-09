@@ -49,6 +49,11 @@ class FakeComfy
 
   def run_seconds(id) = (42.5 if @done.include?(id))
 
+  # Prompts ComfyUI has from elsewhere (queue_size), as set by a spec.
+  attr_writer :queue_size
+
+  def queue_size = @queue_size.to_i
+
   def upload(bytes, name, subfolder: nil, content_type: "image/png")
     (@uploads ||= []) << [ [ subfolder, name ].compact.join("/"), bytes ]
     [ subfolder, name ].compact.join("/")

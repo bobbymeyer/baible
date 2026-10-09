@@ -68,6 +68,11 @@ through a reboot.
   says why), but it would happen every time.
 - **`LLM_TIMEOUT` is 600**, for llama-swap's `ttl: 300`: a cold MoE load is
   ~80s alone, and longer when ComfyUI holds the GPU's memory.
+- **Overnight runs in Los Angeles time** (`NIGHT_TIME_ZONE`), 23:00 to 07:00 unless the
+  Settings page says otherwise. The night shift is a Solid Queue recurring job, so it needs
+  nothing on the host: no cron, no launchd. It lets one thing into ComfyUI at a time and only
+  when ComfyUI's queue is empty, so it stays out of the way of anything else using ComfyUI
+  at night. Training queued for tonight goes after the night's generations.
 - **Images live in their own volume** (`ACTIVE_STORAGE_ROOT=/rails/files`).
   See Backups.
 

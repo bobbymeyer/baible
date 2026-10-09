@@ -34,6 +34,14 @@ shared: &shared
     denoise: 0.6
   # Give up on a batch that hasn't finished after this many seconds.
   timeout: 900
+  # The night window (NightShift, docs/HANDOFF.md "Overnight"): what's
+  # queued for tonight runs between these times, one thing at a time and
+  # only while ComfyUI is otherwise idle. The Settings page overrides them.
+  # A window may cross midnight. The zone is an IANA name (America/Los_Angeles).
+  night:
+    start: "23:00"
+    end: "07:00"
+    zone: <%= ENV.fetch("NIGHT_TIME_ZONE", "UTC").to_json %>
   # Training a LoRA on an entry's picks (Comfy::Training, docs/HANDOFF.md
   # "The LoRA loop"), with ComfyUI's own training nodes. These are starting
   # points for a character from a couple of dozen pictures; a family can

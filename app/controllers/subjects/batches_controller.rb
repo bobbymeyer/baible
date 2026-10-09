@@ -4,29 +4,36 @@
 # batch first saves the subject's own layer as written in the studio (its
 # notes, model and LoRAs; lyrics and length for audio), then queues the
 # candidates with ComfyUI for the subject, one variant, or every variant at
-# once. The studio's strips fill in as they land.
+# once. The studio's strips fill in as they land. Or queue it for the night
+# window instead (tonight: one target, or "every" variant; NightShift).
 class Subjects::BatchesController < ApplicationController
   include SubjectScoped
 
   def create
     @subject.update!(subject_params) if params.key?(:subject)
+    tonight = params[:tonight].present?
     options = { count: params[:count].presence || Comfy.config[:candidates], write: params[:write] != "0",
-                transparent: { "1" => true, "0" => false }[params[:transparent]], draft: params[:draft] == "1" }
+                transparent: { "1" => true, "0" => false }[params[:transparent]], draft: params[:draft] == "1", tonight: tonight }
     if (source = chain_source)
       options.merge!(source: source, denoise: denoise_for(source), draft: false)
     end
 
-    if params[:every] == "1"
+    if params[:every] == "1" || params[:tonight] == "every"
       raise Refusal, "#{@subject.name} has no variants yet" if @subject.variants.empty?
 
       @subject.variants.each { |variant| Batch.start!(@subject, variant: variant, **options) }
     else
       Batch.start!(@subject, variant: target_variant, **options)
     end
-    redirect_to subject_path(@subject, anchor: "batches"), status: :see_other
+    if tonight
+      redirect_to subject_path(@subject, anchor: "batches"), status: :see_other,
+                  notice: "Queued for tonight (#{NightShift.window.label}). It'll be on the Overnight page in the morning."
+    else
+      redirect_to subject_path(@subject, anchor: "batches"), status: :see_other
+    end
   end
 
-  # Throw the candidates away.
+  # Throw the candidates away, or take a batch off tonight's queue.
   def destroy
     @subject.batches.find(params[:id]).destroy!
     redirect_to subject_path(@subject, anchor: "batches"), status: :see_other

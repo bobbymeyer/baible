@@ -106,6 +106,11 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
 7. **Chains:** a batch can start from any image pick in the project, the whole picture or only the
    head cut from a full-body figure. Sprite, then a portrait from its head, then every expression
    from the portrait: the same face throughout.
+8. **Overnight:** "Queue for tonight" in a studio, or "Train tonight" on a training set, and the
+   night shift makes it in the night window (Settings; 23:00 to 07:00 by default), one thing at a
+   time while ComfyUI is otherwise idle, generations before training. In the morning the
+   **Overnight** page has what the night made, ready to pick from. Production runs the night shift
+   every minute under Solid Queue; in development, `bin/rails night:tick` runs one tick by hand.
 
 Every pick has **Download** (the file) and **Sidecar** (how it was made, as JSON; the schema is in
 HANDOFF "Export"). The project's **Manifest** lists the pick that stands for each target (canon,

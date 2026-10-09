@@ -60,9 +60,10 @@
     <div class="actions">
       <%= button_tag "Train in ComfyUI", name: "train", value: "1", class: "button generate", disabled: !reachable,
                                          title: ("ComfyUI isn't answering" unless reachable) %>
-      <%= button_tag "Only keep the set", name: "train", value: "0", class: "button" %>
+      <%= button_tag "Train tonight", name: "train", value: "tonight", class: "button" %>
+      <%= button_tag "Only keep the set", name: "train", value: "0", class: "button button--quiet" %>
       <%= link_to "Cancel", entry_path(@entry), class: "button button--quiet" %>
     </div>
-    <p class="hint">Training takes ComfyUI for a long while (hours), and batches queued behind it wait. A kept set can be trained later, or downloaded for a trainer elsewhere.</p>
+    <p class="hint">Training takes ComfyUI for a long while (hours), and batches queued behind it wait. "Train tonight" starts it in the night window (<%= NightShift.window.label %>), after the night's generations. A kept set can be trained later, or downloaded for a trainer elsewhere.</p>
   <% end %>
 <% end %>

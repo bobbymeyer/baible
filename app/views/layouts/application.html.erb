@@ -24,6 +24,9 @@
         <% elsif authenticated? %>
           <%= link_to "Projects", projects_path, class: ("is-current" if controller_name == "projects") %>
         <% end %>
+        <% if authenticated? %>
+          <%= link_to night_path, class: ("is-current" if controller_name == "nights") do %>Overnight<% if (waiting = NightShift.queued_batches.count + NightShift.queued_trainings.count).positive? %> <span class="muted"><%= waiting %></span><% end %><% end %>
+        <% end %>
       </nav>
       <nav class="topbar__account" aria-label="Account">
         <% if authenticated? %>

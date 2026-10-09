@@ -14,7 +14,9 @@ require "rubygems/package"
 class Training < ApplicationRecord
   include ComfyRun
 
-  STATUSES = [ "set", *ComfyRun::STATUSES ].freeze
+  # "set": kept, not trained. "scheduled": to train in the night window
+  # (NightShift), after the night's generations.
+  STATUSES = [ "set", "scheduled", *ComfyRun::STATUSES ].freeze
   SETTINGS = %w[steps rank learning_rate batch_size].freeze
 
   belongs_to :entry
@@ -43,7 +45,8 @@ class Training < ApplicationRecord
   end
 
   # A new set for an entry. rows: [{ pick:, caption: }] in order; captions
-  # are kept as written, the trigger put first. train: queue it now.
+  # are kept as written, the trigger put first. train: :now to queue it,
+  # :tonight to schedule it for the night window, nil to keep it.
   def self.start!(entry, rows, trigger:, model:, settings:, user:, train:)
     family = Comfy::Family.for(model, capabilities: -> { Comfy.capabilities })
     settings = family.training.merge(settings.to_h.stringify_keys.slice(*SETTINGS).compact_blank)
@@ -58,7 +61,10 @@ class Training < ApplicationRecord
       entry.trainings.create!(version: entry.trainings.maximum(:version).to_i + 1, trigger: trigger, model: model, family: family.slug,
                               settings: settings, items: items, user: user, status: "set")
     end
-    training.train! if train
+    case train
+    when :now then training.train!
+    when :tonight then training.schedule!
+    end
     training
   end
 
@@ -67,12 +73,26 @@ class Training < ApplicationRecord
     where("EXISTS (SELECT 1 FROM json_each(trainings.items) WHERE json_extract(json_each.value, '$.pick_id') = ?)", pick.id).exists?
   end
 
-  # Queue a kept set (or a failed run) for ComfyUI.
+  # Queue a kept set, a failed run or a scheduled one (the night shift) for
+  # ComfyUI.
   def train!
-    raise Refusal, "Only a kept set or a failed run can be trained" unless status.in?(%w[set failed])
+    raise Refusal, "Only a kept set or a failed run can be trained" unless status.in?(%w[set failed scheduled])
 
     update!(status: "queued", error: nil, comfy_prompt_id: nil, submitted_at: nil, lora: nil, workflow: nil)
     TrainingJob.perform_later(self)
+  end
+
+  # To train in the night window (NightShift), or not after all.
+  def schedule!
+    raise Refusal, "Only a kept set or a failed run can be scheduled" unless status.in?(%w[set failed])
+
+    update!(status: "scheduled", error: nil)
+  end
+
+  def unschedule!
+    raise Refusal, "#{title} isn't scheduled" unless status == "scheduled"
+
+    update!(status: "set")
   end
 
   def title = "#{entry.name} v#{version}"

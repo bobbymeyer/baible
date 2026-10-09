@@ -7,7 +7,7 @@
 # or a password in a URL stays in the environment, never in the database.
 class SiteSetting < ApplicationRecord
   URLS = %i[comfy_url llm_url].freeze
-  TEXT = %i[comfy_url comfy_model music_model rmbg_model llm_url llm_model].freeze
+  TEXT = %i[comfy_url comfy_model music_model rmbg_model llm_url llm_model night_start night_end night_zone].freeze
   NUMBERS = %i[draft_size draft_steps draft_denoise candidates].freeze
   FIELDS = (TEXT + NUMBERS).freeze
 
@@ -17,7 +17,8 @@ class SiteSetting < ApplicationRecord
   validates :draft_steps, numericality: { only_integer: true, in: 1..60 }, allow_nil: true
   validates :draft_denoise, numericality: { in: 0.1..1.0 }, allow_nil: true
   validates :candidates, numericality: { only_integer: true, in: 1..8 }, allow_nil: true
-  validate :urls_are_plain_addresses
+  validates :night_start, :night_end, format: { with: /\A([01]\d|2[0-3]):[0-5]\d\z/, message: "must be a time like 23:00" }, allow_nil: true
+  validate :urls_are_plain_addresses, :night_zone_is_known
 
   after_commit { self.class.forget! }
 
@@ -38,6 +39,8 @@ class SiteSetting < ApplicationRecord
   def comfy_overrides
     draft = { pixels: draft_size && draft_size**2, steps: draft_steps, denoise: draft_denoise }.compact
     overrides = { url: comfy_url, model: comfy_model, candidates: candidates }.compact
+    night = { start: night_start, end: night_end, zone: night_zone }.compact
+    overrides[:night] = Rails.configuration.x.comfy.fetch(:night, {}).to_h.symbolize_keys.merge(night) if night.any?
     overrides[:music] = Rails.configuration.x.comfy.fetch(:music, {}).to_h.symbolize_keys.merge(model: music_model) if music_model
     draft.empty? ? overrides : overrides.merge(draft: Rails.configuration.x.comfy.fetch(:draft, {}).to_h.symbolize_keys.merge(draft))
   end
@@ -47,6 +50,10 @@ class SiteSetting < ApplicationRecord
   end
 
   private
+
+  def night_zone_is_known
+    errors.add(:night_zone, "isn't a time zone baible knows (try America/Los_Angeles)") if night_zone && !ActiveSupport::TimeZone[night_zone]
+  end
 
   def urls_are_plain_addresses
     URLS.each do |field|
