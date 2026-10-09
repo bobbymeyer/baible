@@ -7,12 +7,34 @@ Rails.application.routes.draw do
   resource :settings, only: %i[show update]
 
   # Projects, the top layer; their kinds (the middle layer, "art direction"),
-  # and making subjects in them. A project's manifest lists its picks.
+  # their entries (the bible: Cid, across every kind he's made in), and making
+  # subjects in them. A project's manifest lists its picks.
   resources :projects do
     scope module: :projects do
       resources :kinds, except: :show
+      resources :entries, only: %i[index new create]
       resources :subjects, only: %i[new create]
       resource :manifest, only: :show
+    end
+  end
+
+  # An entry's page in the bible (show): its lore, its look and every
+  # subject made of it; editing it; the notes on it; and its LoRA training
+  # sets (index: the runs alone, for their frame to reload).
+  resources :entries, only: %i[show edit update destroy] do
+    scope module: :entries do
+      resources :notes, only: %i[create destroy]
+      resources :trainings, only: %i[index new create]
+    end
+  end
+
+  # A training run: training a kept set (run), the entry using its LoRA or
+  # not (use), its set as a .tar (set), and deleting it.
+  resources :trainings, only: :destroy do
+    scope module: :trainings do
+      resource :run, only: :create
+      resource :use, only: %i[create destroy]
+      resource :set, only: :show
     end
   end
 
@@ -36,8 +58,12 @@ Rails.application.routes.draw do
   end
 
   # What leaves baible: a pick's file and its sidecar (docs/HANDOFF.md "Export").
+  # A pick from the history used again (current), or approved as its
+  # target's canon; letting one go (destroy).
   resources :picks, only: :destroy do
     scope module: :picks do
+      resource :current, only: :create
+      resource :canon, only: %i[create destroy]
       resource :download, only: :show
       resource :sidecar, only: :show
     end
@@ -45,6 +71,9 @@ Rails.application.routes.draw do
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   get "up" => "rails/health#show", as: :rails_health_check
+  # The health a deploy gate can trust: 200 only once the database answered
+  # (HealthController). /up and the signed-out redirect never touch it.
+  resource :health, only: :show, controller: "health"
 
   root "projects#index"
 end

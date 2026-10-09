@@ -1,0 +1,60 @@
+# baible on the Studio (README.md beside this), in deploy-apps.sh's
+# convention: ~/stacks/baible/compose.yaml builds ./app (a clean checkout
+# of bobbymeyer/baible) as baible:current, container baible.
+#
+# Copy this file to ~/stacks/baible/compose.yaml; it is kept in the repo so
+# it is reviewed with the code it runs, not edited only on the machine.
+services:
+  baible:
+    build: ./app
+    image: baible:current
+    container_name: baible
+    restart: unless-stopped
+    # Loopback only: Caddy is the single ingress. 3006 because 3003-3005 are
+    # food, polychrome and onbox, and 3002 is the chassis's old port, still
+    # free and so not to be reused. Thruster listens on 80 in the image.
+    ports:
+      - "127.0.0.1:3006:80"
+    # ComfyUI (8188) and llama-swap (8090) are native launchd agents bound to
+    # the Mac's loopback; host-gateway is the route to them from colima.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: .env
+    environment:
+      RAILS_ENV: production
+      # Every batch and training run is a job that requeues itself while
+      # ComfyUI works, so the queue must run: Solid Queue inside Puma.
+      SOLID_QUEUE_IN_PUMA: "1"
+      # The worker's 3 threads, plus the dispatcher and the scheduler.
+      RAILS_MAX_THREADS: "5"
+      # Picks and candidates in their own volume, apart from the databases.
+      ACTIVE_STORAGE_ROOT: /rails/files
+      COMFY_URL: http://host.docker.internal:8188
+      # Krea 2 Turbo is the image model the Studio has. For drafts and looks;
+      # characters train on SDXL once it's installed (COMFY_TRAINING_MODEL).
+      COMFY_MODEL: krea2_turbo_bf16.safetensors
+      COMFY_TRAINING_MODEL: ""
+      LLM_URL: http://host.docker.internal:8090/v1
+      LLM_MODEL: qwen-moe
+      # Qwen3 thinks first unless told not to, and the thinking can spend the
+      # whole reply (README "The language model").
+      LLM_EXTRA_BODY: '{"chat_template_kwargs":{"enable_thinking":false}}'
+      # llama-swap's ttl is 300: a cold MoE load is ~80s alone, minutes with
+      # ComfyUI holding the GPU's memory.
+      LLM_TIMEOUT: "600"
+    volumes:
+      - baible_storage:/rails/storage # the four SQLite databases
+      - baible_files:/rails/files     # Active Storage: picks, candidates
+    # /health reads the users table (HealthController): /up answers as soon
+    # as Rails boots, and the signed-out redirect never touches SQLite, so
+    # neither is anything for deploy-apps.sh to roll back on.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  baible_storage:
+  baible_files:

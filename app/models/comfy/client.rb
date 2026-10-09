@@ -10,7 +10,7 @@
 # same four calls can stand in for it (spec/support/fake_comfy.rb does):
 #   submit(graph) → prompt id      result(prompt id) → nil or [image]
 #   fetch(image)  → bytes          capabilities      → Comfy::Capabilities
-#   upload(bytes, name) → the name ComfyUI keeps it under (for LoadImage)
+#   upload(bytes, name, subfolder:, content_type:) → the name ComfyUI keeps it under
 #   run_seconds(prompt id) → how long ComfyUI spent on it, once finished
 module Comfy
   class Client
@@ -55,10 +55,14 @@ module Comfy
     end
 
     # Put an image in ComfyUI's input folder, for a LoadImage node to start
-    # from. Returns the name to give LoadImage.
-    def upload(bytes, name)
-      answer = parse(@remote.post_form("/upload/image", [ [ "overwrite", "true" ],
-                                                         [ "image", StringIO.new(bytes.to_s.b), { filename: name, content_type: "image/png" } ] ]))
+    # from, or a file in a subfolder of it (a training set's pictures and
+    # their captions: ComfyUI stores what it is sent). Returns the name to
+    # give LoadImage.
+    def upload(bytes, name, subfolder: nil, content_type: "image/png")
+      fields = [ [ "overwrite", "true" ], [ "type", "input" ] ]
+      fields << [ "subfolder", subfolder ] if subfolder
+      fields << [ "image", StringIO.new(bytes.to_s.b), { filename: name, content_type: content_type } ]
+      answer = parse(@remote.post_form("/upload/image", fields))
       [ answer["subfolder"].presence, answer.fetch("name") { raise Error, "ComfyUI didn't take the image" } ].compact.join("/")
     end
 

@@ -34,6 +34,26 @@ shared: &shared
     denoise: 0.6
   # Give up on a batch that hasn't finished after this many seconds.
   timeout: 900
+  # Training a LoRA on an entry's picks (Comfy::Training, docs/HANDOFF.md
+  # "The LoRA loop"), with ComfyUI's own training nodes. These are starting
+  # points for a character from a couple of dozen pictures; a family can
+  # have its own (`families.<name>.training`), and each run can change them.
+  # ComfyUI runs one thing at a time: batches queued behind a run wait.
+  #
+  # SDXL is the family to train characters on: its lineages have LoRA
+  # ecosystems, and LoRAs work on its full models. Krea 2 Turbo and the
+  # Lightning-style SDXL models are distilled for speed and train poorly;
+  # they are for drafts and looks. `model` is the base model a new training
+  # set offers first (an SDXL checkpoint, say); blank offers the model most
+  # of the set's pictures were made with.
+  training:
+    model: <%= ENV.fetch("COMFY_TRAINING_MODEL", "").to_json %>
+    steps: 1000
+    rank: 16
+    learning_rate: 0.0001
+    batch_size: 1
+    # Give up on a run after this many seconds.
+    timeout: 21600
   # Audio (Comfy::Music, an audio kind's subjects): ACE-Step, through
   # ComfyUI's own nodes (ComfyUI 0.3.34 or later), from its checkpoint in
   # models/checkpoints. A piece is described in tags ("medieval folk, lute,
@@ -135,6 +155,7 @@ shared: &shared
       variants:
         - match: [turbo]
           label: Krea 2 Turbo
+          training_note: "Distilled for speed, with no LoRA ecosystem: for drafts and looks. Train characters on SDXL."
           steps: 8
           cfg: 1.0
     sd15:
@@ -160,20 +181,32 @@ shared: &shared
       negative: true
       pixels: [786432, 1310720]
       multiple: 64
+      # A character LoRA from a couple of dozen 1024px pictures.
+      training:
+        steps: 1500
+        rank: 16
+        learning_rate: 0.0001
+        batch_size: 1
       variants:
+        # Pony and Illustrious retrained their text encoders: each has its
+        # own pool of LoRAs, which don't carry to the other or to base SDXL
+        # (they make garbage, not an error). lora_pool says which.
         - match: [pony]
           label: Pony
+          lora_pool: pony
           prefix: "score_9, score_8_up, score_7_up"
           negative_prefix: "score_4, score_5, score_6"
           prompt_style: tags
           clip_skip: 2
         - match: [illustrious, noob]
           label: Illustrious
+          lora_pool: illustrious
           prefix: "masterpiece, best quality"
           negative_prefix: "worst quality, low quality"
           prompt_style: tags
           clip_skip: 2
         - match: [lightning, turbo, lcm, hyper, dmd]
+          training_note: "Distilled for speed: a LoRA trained on it works poorly. Train on a full SDXL model of the same lineage."
           steps: 6
           cfg: 1.5
           sampler: [euler, euler_ancestral]
@@ -208,6 +241,24 @@ shared: &shared
         surprised: "surprised expression, wide eyes, open mouth"
         worried: "worried expression, knitted brow"
         determined: "determined expression, set jaw"
+    # A character's reference views, each its own full-size picture (made
+    # one by one rather than as one crowded sheet): the face gets the room,
+    # both three-quarter views carry what's on one side only (a scar, a
+    # tattoo), and a few full-body views give the build and clothes.
+    - name: Model sheet
+      medium: image
+      prompt: "character reference, a single figure, even studio lighting, plain white background"
+      negative: "multiple people, cropped, text, dynamic pose"
+      width: 1024
+      height: 1024
+      transparent: false
+      variants:
+        front: "head and shoulders portrait, facing the viewer, neutral expression"
+        three-quarter left: "head and shoulders, three-quarter view, facing left, neutral expression"
+        three-quarter right: "head and shoulders, three-quarter view, facing right, neutral expression"
+        full body front: "full body, standing straight, arms at sides, front view"
+        full body side: "full body, standing straight, side view, profile"
+        full body back: "full body, standing straight, back view, from behind"
     - name: Creature
       medium: image
       prompt: "a single monster, full body, standing, profile view facing left, centered, plain white background"

@@ -14,9 +14,14 @@
       </div>
     </div>
     <div class="field">
+      <%= f.label :entry_id, "Entry" %>
+      <%= f.select :entry_id, @project.entries.map { |entry| [ entry.name, entry.id ] }, include_blank: "None" %>
+      <p class="hint">What it depicts, from the <%= link_to "bible", project_entries_path(@project) %>: its look comes before this subject's notes in every image.</p>
+    </div>
+    <div class="field">
       <%= f.label :notes, "Notes" %>
       <%= f.text_area :notes, rows: 3, placeholder: "What it looks (or sounds) like: green skin, a rusty knife, a patched cloak" %>
-      <p class="hint">The subject's own layer, after the kind's framing. For an image, its name comes first; for audio, these are tags.</p>
+      <p class="hint">The subject's own layer, after the kind's framing (and the entry's look). For an image, its name comes first; for audio, these are tags.</p>
     </div>
     <div class="field">
       <%= f.label :lyrics, "Lyrics (audio only; blank for instrumental)" %>

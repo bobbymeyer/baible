@@ -18,6 +18,7 @@
       <nav class="topbar__nav" aria-label="Project">
         <% if @project&.persisted? && authenticated? %>
           <%= link_to @project.name, project_path(@project), class: "topbar__project" %>
+          <%= link_to "Bible", project_entries_path(@project), class: ("is-current" if controller_path.in?(%w[projects/entries entries])) %>
           <%= link_to "Kinds", project_kinds_path(@project), class: ("is-current" if controller_path == "projects/kinds") %>
           <%= link_to "Manifest", project_manifest_path(@project, inline: 1), title: "Every current pick, as JSON" %>
         <% elsif authenticated? %>

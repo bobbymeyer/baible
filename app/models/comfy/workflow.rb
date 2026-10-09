@@ -28,30 +28,10 @@ module Comfy
       model_name = recipe["model"] || recipe["checkpoint"]
       family = Family.new(recipe["family"].presence || Family.for(model_name, capabilities: caps).slug, model_name)
       graph = {}
-      id = 0
-      add = ->(class_type, inputs) { graph[(id += 1).to_s] = { "class_type" => class_type, "inputs" => inputs }; id.to_s }
+      add = adder(graph)
       need = ->(node) { caps.node?(node) or raise Error, "ComfyUI has no #{node} node" }
 
-      if (file = caps.find(caps.diffusion_models, model_name))
-        need.("UNETLoader")
-        model = [ add.("UNETLoader", { "unet_name" => file, "weight_dtype" => "default" }), 0 ]
-        encoder = caps.find_like(caps.text_encoders, family.text_encoders) or
-          raise Error, "#{family.label} needs its text encoder in models/text_encoders (a file like #{family.text_encoders.first || '?'})"
-        type = caps.prefer(caps.clip_types, family.clip_types) or
-          raise Error, "This ComfyUI's CLIPLoader has no #{family.clip_types.join(' or ')} type: update ComfyUI"
-        clip = [ add.("CLIPLoader", { "clip_name" => encoder, "type" => type }), 0 ]
-        vae_file = caps.find_like(caps.vaes, family.vaes) or
-          raise Error, "#{family.label} needs its VAE in models/vae (a file like #{family.vaes.first || '?'})"
-        vae = [ add.("VAELoader", { "vae_name" => vae_file }), 0 ]
-      elsif (file = caps.find(caps.checkpoints, model_name))
-        checkpoint = add.("CheckpointLoaderSimple", { "ckpt_name" => file })
-        model = [ checkpoint, 0 ]
-        clip = [ checkpoint, 1 ]
-        override = caps.find_like(caps.vaes, family.vae_overrides)
-        vae = override ? [ add.("VAELoader", { "vae_name" => override }), 0 ] : [ checkpoint, 2 ]
-      else
-        raise Error, "#{model_name} isn't on ComfyUI (looked in models/diffusion_models and models/checkpoints)"
-      end
+      model, clip, vae = load(add, model_name, family, caps)
 
       active_loras(recipe).each do |lora|
         name = caps.find(caps.loras, lora["name"]) or raise Error, "The LoRA #{lora['name']} isn't on ComfyUI (models/loras)"
@@ -109,6 +89,43 @@ module Comfy
 
       add.("SaveImage", { "filename_prefix" => prefix, "images" => image })
       graph
+    end
+
+    # A graph to add nodes to: add.(class_type, inputs) gives the new node's id.
+    def adder(graph)
+      lambda do |class_type, inputs|
+        (graph.size + 1).to_s.tap { |id| graph[id] = { "class_type" => class_type, "inputs" => inputs } }
+      end
+    end
+
+    # The model, its text encoder and its VAE, loaded the way the model's
+    # file is stored, as [model, clip, vae], each [node id, output]: a bare
+    # diffusion model with its family's text encoder and VAE found beside it,
+    # or a checkpoint with its own (or the family's VAE in its place).
+    # Training loads it the same way (Comfy::Training).
+    def load(add, model_name, family, caps)
+      need = ->(node) { caps.node?(node) or raise Error, "ComfyUI has no #{node} node" }
+      if (file = caps.find(caps.diffusion_models, model_name))
+        need.("UNETLoader")
+        model = [ add.("UNETLoader", { "unet_name" => file, "weight_dtype" => "default" }), 0 ]
+        encoder = caps.find_like(caps.text_encoders, family.text_encoders) or
+          raise Error, "#{family.label} needs its text encoder in models/text_encoders (a file like #{family.text_encoders.first || '?'})"
+        type = caps.prefer(caps.clip_types, family.clip_types) or
+          raise Error, "This ComfyUI's CLIPLoader has no #{family.clip_types.join(' or ')} type: update ComfyUI"
+        clip = [ add.("CLIPLoader", { "clip_name" => encoder, "type" => type }), 0 ]
+        vae_file = caps.find_like(caps.vaes, family.vaes) or
+          raise Error, "#{family.label} needs its VAE in models/vae (a file like #{family.vaes.first || '?'})"
+        vae = [ add.("VAELoader", { "vae_name" => vae_file }), 0 ]
+      elsif (file = caps.find(caps.checkpoints, model_name))
+        checkpoint = add.("CheckpointLoaderSimple", { "ckpt_name" => file })
+        model = [ checkpoint, 0 ]
+        clip = [ checkpoint, 1 ]
+        override = caps.find_like(caps.vaes, family.vae_overrides)
+        vae = override ? [ add.("VAELoader", { "vae_name" => override }), 0 ] : [ checkpoint, 2 ]
+      else
+        raise Error, "#{model_name} isn't on ComfyUI (looked in models/diffusion_models and models/checkpoints)"
+      end
+      [ model, clip, vae ]
     end
 
     # The LoRAs that take part: switched on, with some strength.

@@ -62,8 +62,12 @@ RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 FROM base
 
 # Run and own only the runtime files as a non-root user for security
+# /rails/files is where Active Storage keeps files when ACTIVE_STORAGE_ROOT
+# points there (a volume of its own); made here, as root, so a new volume
+# starts owned by rails.
 RUN groupadd --system --gid 1000 rails && \
-    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash
+    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
+    mkdir -p /rails/files && chown rails:rails /rails/files
 USER 1000:1000
 
 # Copy built artifacts: gems, application

@@ -1,0 +1,29 @@
+<%# Notes on an entry, newest first, and adding one. entry. %>
+<%= form_with model: Note.new, url: entry_notes_path(entry), class: "form" do |f| %>
+  <div class="field">
+    <%= f.label :body, "Add a note", for: "new_note_body" %>
+    <%= f.text_area :body, rows: 3, required: true, id: "new_note_body",
+                    placeholder: "Open questions, decisions, notes for whoever draws it next. Never in a prompt." %>
+  </div>
+  <div class="actions"><%= f.submit "Add the note", class: "button" %></div>
+<% end %>
+<% notes = entry.notes.includes(:user) %>
+<% if notes.empty? %>
+  <p class="empty">No notes yet.</p>
+<% else %>
+  <ol class="notes">
+    <% notes.each do |note| %>
+      <li class="note" id="<%= dom_id(note) %>">
+        <p class="note__meta">
+          <strong><%= note.author %></strong>
+          <time datetime="<%= note.created_at.utc.iso8601 %>" title="<%= note.created_at.utc.iso8601 %>"><%= time_ago_in_words(note.created_at) %> ago</time>
+          <% if note.user_id == Current.user&.id %>
+            <%= button_to "Take back", entry_note_path(entry, note), method: :delete, class: "link-button",
+                          form: { class: "inline", data: { turbo_confirm: "Take this note back?" } } %>
+          <% end %>
+        </p>
+        <div class="prose"><%= simple_format(note.body) %></div>
+      </li>
+    <% end %>
+  </ol>
+<% end %>

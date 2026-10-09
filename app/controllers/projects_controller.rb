@@ -10,7 +10,7 @@ class ProjectsController < ApplicationController
   end
 
   def show
-    @kinds = @project.kinds.includes(subjects: [ :variants, { picks: { file_attachment: :blob } } ])
+    @kinds = @project.kinds.includes(subjects: [ :entry, :variants, { picks: { file_attachment: :blob } } ])
   end
 
   def new

@@ -7,6 +7,7 @@
 class Project < ApplicationRecord
   # Subjects first, so a kind isn't kept by its own subjects (Kind restricts).
   has_many :subjects, dependent: :destroy
+  has_many :entries, -> { order(:name) }, dependent: :destroy, inverse_of: :project
   has_many :kinds, -> { order(:position, :id) }, dependent: :destroy, inverse_of: :project
   has_many :picks, through: :subjects
 

@@ -9,7 +9,7 @@
 </div>
 <p class="prose">
   Every recipe is made in layers: <%= link_to "#{@project.name}'s house style", edit_project_path(@project) %>, then the framing for its
-  kind, then the subject's own words, then a variant's. Any image layer can name a model, and the lowest one that does wins.
+  kind, then the look of the entry it depicts (if any), then the subject's own words, then a variant's. Any image layer can name a model, and the lowest one that does wins.
   LoRAs stack in layer order; a later layer that names the same LoRA changes its strength or switches it off.
   The ComfyUI workflow is built for each image from the model's family and what ComfyUI has installed.
 </p>

@@ -44,6 +44,19 @@ module Comfy
 
     def label = settings["label"] || slug.humanize
     def steps = settings.fetch("steps", 25).to_i
+
+    # How a LoRA is trained on it (config/comfy.yml `training`, with the
+    # family's own `training` over it): steps, rank, learning_rate, batch_size.
+    def training
+      Comfy.config.fetch(:training, {}).to_h.deep_stringify_keys.except("timeout", "model").merge(settings.fetch("training", {}).to_h)
+    end
+
+    # Why not to train on it, when there's a reason (a distilled model).
+    def training_note = settings["training_note"].presence
+
+    # The LoRAs that work on it: its family's, unless a lineage retrained
+    # the text encoder and has its own (Pony, Illustrious).
+    def lora_pool = settings["lora_pool"].presence || slug
     def cfg = settings.fetch("cfg", 6.0).to_f
     def prefix = settings["prefix"].to_s
     def negative_prefix = settings["negative_prefix"].to_s

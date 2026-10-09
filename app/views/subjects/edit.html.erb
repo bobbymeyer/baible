@@ -1,6 +1,6 @@
 <% content_for :title, "#{@subject.name} · #{@project.name}" %>
 <div class="crumbs"><%= link_to @project.name, project_path(@project) %> / <%= link_to @subject.name, subject_path(@subject) %></div>
-<h1>Rename or move <%= @subject.name %></h1>
+<h1>Rename, move or link <%= @subject.name %></h1>
 <%= form_with model: @subject, class: "form" do |f| %>
   <%= render "shared/errors", record: @subject %>
   <div class="field-row">
@@ -11,6 +11,11 @@
       <p class="hint">Another <%= @subject.medium %> kind; its picks stay.</p>
     </div>
   </div>
+    <div class="field">
+      <%= f.label :entry_id, "Entry" %>
+      <%= f.select :entry_id, @project.entries.map { |entry| [ entry.name, entry.id ] }, include_blank: "None" %>
+      <p class="hint">What it depicts, from the <%= link_to "bible", project_entries_path(@project) %>: its look comes before this subject's notes in every image.</p>
+    </div>
   <p class="hint">Notes, model and LoRAs are edited in the studio, where they're generated with.</p>
   <div class="actions">
     <%= f.submit "Save", class: "button button--primary" %>

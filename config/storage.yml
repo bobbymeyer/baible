@@ -2,9 +2,13 @@ test:
   service: Disk
   root: <%= Rails.root.join("tmp/storage") %>
 
+# Generated files and picks. ACTIVE_STORAGE_ROOT puts them in a volume of
+# their own, apart from the databases in storage/, so the databases can be
+# archived daily without fourteen copies of a growing image library
+# (deploy/studio/README.md "Backups").
 local:
   service: Disk
-  root: <%= Rails.root.join("storage") %>
+  root: <%= ENV.fetch("ACTIVE_STORAGE_ROOT") { Rails.root.join("storage") } %>
 
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:

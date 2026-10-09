@@ -23,6 +23,20 @@ module Llm
     Client.new
   end
 
+  # LLM_EXTRA_BODY as a hash: a JSON object, or nothing. Anything else is a
+  # mistake to say out loud rather than a request quietly sent without it.
+  def self.extra_body(value)
+    return value.to_h.stringify_keys if value.is_a?(Hash)
+    return {} if value.to_s.strip.empty?
+
+    parsed = JSON.parse(value.to_s)
+    raise Error, "LLM_EXTRA_BODY must be a JSON object" unless parsed.is_a?(Hash)
+
+    parsed
+  rescue JSON::ParserError
+    raise Error, "LLM_EXTRA_BODY isn't valid JSON"
+  end
+
   # The first JSON object in a reply, or nil: code fences and chatter
   # around it are ignored.
   def self.parse_json(text)

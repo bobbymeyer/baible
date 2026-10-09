@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 # Helpers for composing a recipe in layers (docs/HANDOFF.md "The layered
-# recipe"): the project's house style, the kind's framing, the subject's
-# specifics, a variant's detail.
+# recipe"): the project's house style, the kind's framing, the entry's look,
+# the subject's specifics, a variant's detail.
 module ArtDirection
   module_function
 
@@ -43,9 +43,10 @@ module ArtDirection
     layers_bottom_up.map { |model| model.to_s.strip }.find { |model| !model.empty? }
   end
 
-  # The prompt from a recipe's parts, in layer order.
+  # The prompt from a recipe's parts, in layer order. (Recipes made before
+  # entries have no "entry" part.)
   def compose(parts)
-    join_prompt(*parts.values_at("prefix", "style", "framing", "subject", "detail"))
+    join_prompt(*parts.values_at("prefix", "style", "framing", "entry", "subject", "detail"))
   end
 
   def join_prompt(*parts)

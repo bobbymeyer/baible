@@ -48,7 +48,10 @@ what a failure usually means.
 | `LLM_URL` | blank (off) | An OpenAI-compatible API, up to `/v1` (llama.cpp, llama-swap, Ollama, LM Studio, vLLM, hosted) |
 | `LLM_MODEL` | blank | The model to ask for, as the server names it |
 | `LLM_TOKEN`, `LLM_HEADERS` | blank | As for ComfyUI |
-| `LLM_TIMEOUT` | `120` | Seconds, room for the server to load the model |
+| `LLM_TIMEOUT` | `600` | Seconds, room for the server to load the model (llama-swap unloads idle ones) |
+| `LLM_EXTRA_BODY` | `{}` | More fields for every request, as JSON. Qwen3 on llama.cpp or llama-swap: `{"chat_template_kwargs":{"enable_thinking":false}}`, or its thinking can spend the whole reply |
+| `COMFY_TRAINING_MODEL` | blank | The base model a new training set offers first: a full SDXL checkpoint (README "Training") |
+| `ACTIVE_STORAGE_ROOT` | `storage/` | Where generated files are kept, so they can sit in a volume apart from the databases |
 
 The Settings page overrides the addresses and model names. Tokens, headers and passwords only ever
 live in the environment, never in the database, and no message repeats them.
@@ -83,19 +86,66 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
 2. **Kinds** (the project's art direction): framing, negative, size, background removal, model and
    LoRAs per kind of image; tags, length and checkpoint per kind of audio; and the variants each new
    subject starts with (a Portrait's expressions).
-3. **Add a subject** to a kind: the goblin, Cid, the harbour town, the harbour's theme.
-4. **In its studio**, see the layers, write its notes (and model and LoRAs, or lyrics and length),
+3. **The bible** (optional): add an **entry** for each thing in the world that's made in more than
+   one kind, like Cid or the harbour town. Its **lore** and **notes** (a signed log: questions,
+   decisions, notes for whoever draws it next) are for people and never go in a prompt. Its **look**
+   (and LoRAs) is the same words in every image of it, after the kind's framing. From its page,
+   "Make Cid as…" adds a subject of any kind, of that entry; the page then shows every pick of it.
+   The **Model sheet** kind makes a character's reference views (front, both three-quarters, full
+   body front, side and back), each its own picture.
+4. **Add a subject** to a kind: the goblin, Cid, the harbour town, the harbour's theme.
+5. **In its studio**, see the layers, write its notes (and model and LoRAs, or lyrics and length),
    and **Generate** for the subject, one variant, or every variant. Drafts first by default for
    images: "Make this one properly" renders the one you like at full quality from the draft.
    Candidates appear as they land, for everyone watching.
-5. **Use this** picks a candidate: it becomes the subject's (or variant's) pick, with its seed and
-   recipe.
-6. **Chains:** a batch can start from any image pick in the project, the whole picture or only the
+6. **Use this** picks a candidate: it becomes the subject's (or variant's) current pick, with its
+   seed, recipe and who picked it. Earlier picks stay in its **history** ("Use this again").
+   **Approve as canon** marks the one that's approved; a later pick doesn't replace canon until
+   someone approves it, and canon can't be let go until it's unapproved. What stands for a target
+   everywhere (the bible, the manifest, chains) is its canon pick, else its current one.
+7. **Chains:** a batch can start from any image pick in the project, the whole picture or only the
    head cut from a full-body figure. Sprite, then a portrait from its head, then every expression
    from the portrait: the same face throughout.
 
 Every pick has **Download** (the file) and **Sidecar** (how it was made, as JSON; the schema is in
-HANDOFF "Export"). The project's **Manifest** lists every current pick with where to download each.
+HANDOFF "Export"). The project's **Manifest** lists the pick that stands for each target (canon,
+else current) with where to download each.
+
+## Training
+
+An entry's picks can train a LoRA in ComfyUI (HANDOFF "The LoRA loop"): on its page, **New training
+set**, tick the pictures, check their captions, and **Train in ComfyUI** (or keep the set, to train
+later or download as a `.tar` for another trainer). When it's done the entry uses the LoRA: every
+image of it made with a model of the same family gets the trigger and the LoRA.
+
+- ComfyUI needs its training nodes (`TrainLoraNode`, `SaveLoRA`, `LoadImageTextDataSetFromFolder`,
+  `MakeTrainingDataset`, `ResolutionBucket`): a recent ComfyUI has them. A run takes hours and
+  holds ComfyUI's queue meanwhile.
+- `SaveLoRA` saves into ComfyUI's **output** folder. To have ComfyUI (and baible) see the LoRA
+  there, add the folder to ComfyUI's LoRA folders in its `extra_model_paths.yaml` and restart it:
+
+  ```yaml
+  baible:
+      base_path: /path/to/ComfyUI/output
+      loras: loras
+  ```
+
+  Or move `output/loras/baible/<name>.safetensors` into `models/loras/baible/` by hand.
+- **Train characters on SDXL.** A LoRA works only on models that take its lineage's LoRAs:
+  base SDXL, Pony and Illustrious each have their own pool, and a LoRA from one makes garbage on
+  another rather than an error. baible switches an entry's LoRA off for any model outside its pool.
+  Krea 2 Turbo and Lightning-style SDXL models are distilled for speed and train poorly: use them
+  for drafts and looks. Set `COMFY_TRAINING_MODEL` to the SDXL checkpoint to train on. The
+  pictures in a set can come from any model.
+- Settings (steps, rank, learning rate, batch size) start from `training` in `config/comfy.yml`,
+  with SDXL's own over them; each run can change them. They're starting points, not tuned values.
+
+## Deploying
+
+`/health` answers 200 only once the database has answered (signed out, to any client), for a
+container healthcheck or a deploy gate; `/up` and the signed-out redirect never touch the database.
+`deploy/studio/` has the compose file and notes for running baible on a Mac behind Caddy on a
+tailnet, beside native ComfyUI and llama-swap.
 
 ## Bringing assets into polychrome
 
@@ -106,7 +156,7 @@ polychrome only takes uploads; there's no API between the two.
    its edit page, a speaker's portraits (one per expression) and sprite in their form, a track in
    the world's Music book.
 
-The starter kinds line up with polychrome's slots: Creature (Bestiary), Item (Armory), Emblem
+Apart from Model sheet, the starter kinds line up with polychrome's slots: Creature (Bestiary), Item (Armory), Emblem
 (Grimoire), Location (Gazetteer), Character sprite and Portrait (speakers; Portrait's variants are
 polychrome's expressions, the subject itself being Neutral), Scene (scene panels), Map, Music.
 
@@ -114,7 +164,7 @@ polychrome's expressions, the subject itself being Neutral), Scene (scene panels
 
 | Path | What |
 | --- | --- |
-| `app/models/project.rb`, `kind.rb`, `subject.rb`, `variant.rb` | The layers; `Subject#recipe` composes them |
+| `app/models/project.rb`, `kind.rb`, `entry.rb`, `subject.rb`, `variant.rb` | The layers; `Subject#recipe` composes them |
 | `app/models/batch.rb`, `candidate.rb`, `pick.rb`, `app/jobs/batch_job.rb` | Generating, collecting, picking; `Pick#sidecar` |
 | `app/models/comfy/`, `remote.rb`, `llm/`, `prompt_writer.rb` | ComfyUI and the language model over HTTP, workflow building |
 | `app/models/cutout.rb`, `headshot.rb` | Background removal and its mending; the head cut for chains |

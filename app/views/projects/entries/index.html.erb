@@ -1,0 +1,30 @@
+<% content_for :title, "Bible · #{@project.name}" %>
+<div class="crumbs"><%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %></div>
+<div class="page-header">
+  <h1>Bible</h1>
+  <div class="actions"><%= link_to "New entry", new_project_entry_path(@project), class: "button" %></div>
+</div>
+<p class="prose">
+  An entry is one thing in <%= @project.name %> across every kind it's made in: a character's sprite, portrait and key art; a
+  place's establishing view and map. Its look is a layer of every image of it; its lore is for people, never a prompt.
+</p>
+<% if @entries.empty? %>
+  <p class="empty">No entries yet. <%= link_to "Add the first", new_project_entry_path(@project) %>.</p>
+<% else %>
+  <ul class="subject-grid">
+    <% @entries.each do |entry| %>
+      <% cover = entry.cover %>
+      <li class="subject-tile">
+        <%= link_to entry_path(entry) do %>
+          <% if cover %>
+            <%= image_tag url_for(cover.file), alt: "", class: "thumb", loading: "lazy" %>
+          <% else %>
+            <span class="plate" aria-hidden="true"><%= entry.name.first %></span>
+          <% end %>
+          <strong><%= entry.name %></strong>
+          <small><%= entry.subjects.map(&:kind).uniq.map(&:name).join(" · ").presence || "Not made yet" %><%= " · #{pluralize(entry.notes.size, 'note')}" if entry.notes.any? %></small>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

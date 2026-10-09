@@ -4,13 +4,16 @@
 # harbour town, the harbour town's theme. Its own layer of the recipe is its
 # name and notes, a model and LoRAs (an audio subject: notes as tags,
 # lyrics and a length). Variants add a last, detail layer ("happy").
+# It may be one depiction of an entry (Cid's portrait, of Cid), whose look
+# comes before it in an image's recipe.
 #
 # A batch makes candidates for the subject itself or for one of its
 # variants (the target), and the one picked is kept, with how it was made,
-# as that target's Pick.
+# as one of that target's Picks.
 class Subject < ApplicationRecord
   belongs_to :project
   belongs_to :kind
+  belongs_to :entry, optional: true
   has_many :variants, -> { order(:position, :id) }, dependent: :destroy, inverse_of: :subject
   has_many :batches, dependent: :destroy
   has_many :picks, dependent: :destroy
@@ -19,7 +22,7 @@ class Subject < ApplicationRecord
 
   validates :name, presence: true, uniqueness: { scope: :kind_id }
   validates :seconds, numericality: { only_integer: true, in: Kind::SECONDS }, allow_nil: true
-  validate :kind_in_project
+  validate :kind_in_project, :entry_in_project
 
   after_create :add_preset_variants
 
@@ -29,10 +32,22 @@ class Subject < ApplicationRecord
     super(ArtDirection.loras(value))
   end
 
-  # The pick for the subject itself (variant nil) or a variant.
+  # What stands for the subject itself (variant nil) or a variant: its
+  # canon pick, or its current one (docs/HANDOFF.md "Picks: history and
+  # canon").
   def pick_for(variant = nil)
-    picks.loaded? ? picks.find { |pick| pick.variant_id == variant&.id } : picks.find_by(variant_id: variant&.id)
+    target = target_picks(variant)
+    target.find(&:canon?) || target.find(&:current?)
   end
+
+  # Every pick of a target, newest first: its history.
+  def target_picks(variant = nil)
+    rows = picks.loaded? ? picks.select { |pick| pick.variant_id == variant&.id } : picks.where(variant_id: variant&.id).to_a
+    rows.sort_by { |pick| [ pick.created_at, pick.id ] }.reverse
+  end
+
+  # How many of its targets (itself and each variant) have a pick.
+  def picked_targets = picks.map(&:variant_id).uniq.size
 
   # The newest round for a target, if any.
   def batch_for(variant = nil)
@@ -57,14 +72,33 @@ class Subject < ApplicationRecord
     end
   end
 
+  # What the entry layer says, for an image: the trigger of the LoRA it uses
+  # (when that LoRA is on for this family), then its look. Audio has no
+  # entry layer (a look isn't a sound); an audio subject joins an entry only
+  # to sit on its page.
+  def entry_prompt(family = image_family)
+    entry && !audio? ? ArtDirection.join_prompt(entry.trained_trigger(family), entry.look) : ""
+  end
+
+  # The entry's LoRAs: the one it trained first, then any it names.
+  def entry_loras(family = image_family)
+    entry && !audio? ? [ entry.trained_lora(family), *entry.loras ].compact : []
+  end
+
+  def image_family = Comfy::Family.for(model_file, capabilities: -> { Comfy.capabilities })
+
   # The layers as shown in the studio, top to bottom.
   def layers(variant = nil)
     top = audio? ? { "prompt" => project.sound, "model" => nil, "loras" => [] } : { "prompt" => project.style, "model" => project.model, "loras" => project.loras }
     rows = [
       top.merge("label" => project.name, "role" => "Project"),
-      { "label" => kind.name, "role" => "Kind", "prompt" => kind.prompt, "model" => kind.model, "loras" => audio? ? [] : kind.loras },
-      { "label" => name, "role" => "Subject", "prompt" => subject_prompt, "model" => model, "loras" => audio? ? [] : loras }
+      { "label" => kind.name, "role" => "Kind", "prompt" => kind.prompt, "model" => kind.model, "loras" => audio? ? [] : kind.loras }
     ]
+    if entry && image?
+      family = image_family
+      rows << { "label" => entry.name, "role" => "Entry", "prompt" => entry_prompt(family), "model" => nil, "loras" => entry_loras(family) }
+    end
+    rows << { "label" => name, "role" => "Subject", "prompt" => subject_prompt, "model" => model, "loras" => audio? ? [] : loras }
     rows << { "label" => variant.name, "role" => "Variant", "prompt" => variant.prompt, "loras" => [] } if variant
     rows
   end
@@ -83,13 +117,13 @@ class Subject < ApplicationRecord
     model = model_file
     family = Comfy::Family.for(model, capabilities: -> { Comfy.capabilities })
     parts = { "prefix" => family.prefix, "style" => project.style.to_s, "framing" => kind.prompt.to_s,
-              "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
+              "entry" => entry_prompt(family), "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
     width, height = family.size(kind.width, kind.height)
     {
       "medium" => "image",
       "model" => model,
       "family" => family.slug,
-      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, loras),
+      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras(family), loras),
       "positive" => ArtDirection.compose(parts),
       "negative" => family.negative? ? ArtDirection.join_prompt(family.negative_prefix, project.negative, kind.negative) : "",
       "width" => width,
@@ -131,6 +165,10 @@ class Subject < ApplicationRecord
 
   def kind_in_project
     errors.add(:kind, "must be one of the project's") if kind && project && kind.project_id != project_id
+  end
+
+  def entry_in_project
+    errors.add(:entry, "must be one of the project's") if entry && project && entry.project_id != project_id
   end
 
   def add_preset_variants

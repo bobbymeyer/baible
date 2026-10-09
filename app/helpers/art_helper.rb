@@ -55,10 +55,10 @@ module ArtHelper
   # Whether ComfyUI answers, for the generate buttons.
   def comfy_reachable? = Comfy.capabilities.reachable?
 
-  # Picks of the project's images to start a batch from, grouped by subject,
+  # The project's standing image picks to start a batch from, grouped by subject,
   # for a select: [[subject, [[label, id], ...]], ...].
   def chain_choices(project)
-    picks = project.picks.images.includes(:variant, :subject).sort_by { |pick| [ pick.subject.name.downcase, pick.variant&.position.to_i, pick.variant_id.to_i ] }
+    picks = Pick.standing(project.picks.images.includes(:variant, :subject)).sort_by { |pick| [ pick.subject.name.downcase, pick.variant&.position.to_i, pick.variant_id.to_i ] }
     picks.group_by(&:subject).map do |subject, rows|
       [ "#{subject.name} (#{subject.kind.name})", rows.map { |pick| [ "#{pick.variant ? pick.variant.name : 'itself'} · seed #{pick.seed}", pick.id ] } ]
     end

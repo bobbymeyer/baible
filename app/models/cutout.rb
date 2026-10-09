@@ -157,6 +157,14 @@ module Cutout
     image.has_alpha? ? image.extract_band(0, n: image.bands - 1).pngsave_buffer : bytes
   end
 
+  # The picture on white where it is see-through, as a training set wants
+  # it (Training#picture). PNG bytes in and out.
+  def self.on_white(bytes)
+    require "vips"
+    image = Vips::Image.new_from_buffer(bytes, "")
+    image.has_alpha? ? image.flatten(background: [ 255 ] * (image.bands - 1)).cast(:uchar).pngsave_buffer : bytes
+  end
+
   # The ground's colour: the picture's border, averaged.
   def self.ground_colour(colours)
     width, height = colours.width, colours.height

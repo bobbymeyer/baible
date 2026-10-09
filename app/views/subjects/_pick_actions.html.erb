@@ -1,0 +1,16 @@
+<%# What can be done with one pick. pick; history: true in the history list (offers "Use this again"). %>
+<div class="pick__links">
+  <%= link_to "Download", pick_download_path(pick), data: { turbo: false } %>
+  <%= link_to "Sidecar", pick_sidecar_path(pick), data: { turbo: false }, title: "How it was made, as JSON" %>
+  <% if local_assigns[:history] && !pick.current? %>
+    <%= button_to "Use this again", pick_current_path(pick), class: "link-button", form: { class: "inline" } %>
+  <% end %>
+  <% if pick.canon? %>
+    <%= button_to "Unapprove", pick_canon_path(pick), method: :delete, class: "link-button",
+                  form: { class: "inline", data: { turbo_confirm: "Take back #{pick.title}'s canon?" } } %>
+  <% else %>
+    <%= button_to "Approve as canon", pick_canon_path(pick), class: "link-button", form: { class: "inline" } %>
+    <%= button_to "Let go", pick_path(pick), method: :delete, class: "link-button",
+                  form: { class: "inline", data: { turbo_confirm: "Let this pick of #{pick.title} go? Its file goes too." } } %>
+  <% end %>
+</div>

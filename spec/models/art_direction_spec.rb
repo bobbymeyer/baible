@@ -61,7 +61,7 @@ RSpec.describe "Composing a recipe in layers" do
         "negative" => "score_4, score_5, score_6, photo, cropped",
         "width" => 896, "height" => 896, "transparent" => true,
         "parts" => { "prefix" => "score_9, score_8_up, score_7_up", "style" => "16-bit pixel art", "framing" => "profile view, full body",
-                     "subject" => "Goblin, green skin, a rusty knife", "detail" => "" }
+                     "entry" => "", "subject" => "Goblin, green skin, a rusty knife", "detail" => "" }
       )
 
       goblin.update!(model: "anima-preview.safetensors")
@@ -76,6 +76,29 @@ RSpec.describe "Composing a recipe in layers" do
       expect(recipe["parts"]["detail"]).to eq("grinning")
       expect(recipe["model"]).to eq(Comfy.config[:model])
       expect(goblin.layers(happy).map { |layer| layer["role"] }).to eq(%w[Project Kind Subject Variant])
+    end
+
+    it "puts an entry's look after the kind's framing, word for word, and its LoRAs between the kind's and the subject's" do
+      project.update!(loras: [ { "name" => "house", "strength" => 0.8 } ])
+      grax = project.entries.create!(name: "Grax", look: "one tusk, a scarred left cheek",
+                                     loras: [ { "name" => "grax", "strength" => 0.9 }, { "name" => "house", "strength" => 0.4 } ])
+      goblin.update!(entry: grax, notes: "crouching", loras: [ { "name" => "grax", "strength" => 0.7 } ])
+
+      recipe = goblin.recipe
+      expect(recipe["positive"]).to end_with("#{goblin.kind.prompt}, one tusk, a scarred left cheek, Goblin, crouching")
+      expect(recipe["parts"]).to include("entry" => "one tusk, a scarred left cheek", "subject" => "Goblin, crouching")
+      expect(recipe["loras"]).to eq([ { "name" => "house", "strength" => 0.4, "on" => true }, { "name" => "grax", "strength" => 0.7, "on" => true } ])
+      expect(goblin.layers.map { |layer| layer["role"] }).to eq(%w[Project Kind Entry Subject])
+
+      theme = make_subject(project, "Music", "Grax's theme", entry: grax, notes: "war drums")
+      expect(theme.recipe["positive"]).not_to include("tusk") # a look isn't a sound
+      expect(theme.layers.map { |layer| layer["role"] }).to eq(%w[Project Kind Subject])
+    end
+
+    it "keeps an entry to its own project" do
+      elsewhere = Project.create!(name: "Elsewhere").entries.create!(name: "Grax")
+      expect(goblin.update(entry: elsewhere)).to be(false)
+      expect(goblin.errors[:entry]).to be_present
     end
 
     it "composes audio from the project's sound, the kind's tags and the subject's, with its lyrics and length" do
