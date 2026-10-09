@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_090000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -101,6 +101,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_170000) do
     t.datetime "updated_at", null: false
     t.index ["project_id", "name"], name: "index_kinds_on_project_id_and_name", unique: true
     t.index ["project_id"], name: "index_kinds_on_project_id"
+  end
+
+  create_table "night_summaries", force: :cascade do |t|
+    t.datetime "opened_at", null: false
+    t.datetime "closed_at", null: false
+    t.text "text", null: false
+    t.json "payload", default: {}, null: false
+    t.datetime "sent_at"
+    t.text "error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["closed_at"], name: "index_night_summaries_on_closed_at", unique: true
   end
 
   create_table "notes", force: :cascade do |t|
