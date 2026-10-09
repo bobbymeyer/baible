@@ -273,6 +273,18 @@ details[open] > summary { margin-bottom: 16px; }
 .pick figcaption strong { display: block; font-size: 14px; }
 .pick audio { width: 100%; }
 .pick__links { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+/* Canon: a heavy black frame on the picture, and the word. Current: the word alone. */
+.pick__state { display: inline-block; margin-right: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.pick.is-canon > figure .thumb, .history__item.is-canon .thumb { outline: 3px solid var(--ink); outline-offset: -3px; }
+.pick figcaption .muted { display: block; }
+/* A target's history: every pick, newest first, small. */
+.history { margin-top: 8px; font-size: 13px; }
+.history__list { list-style: none; margin: 8px 0 0; padding: 0; }
+.history__item { display: grid; grid-template-columns: 64px 1fr; gap: 0 12px; align-items: start; padding: 8px 0; border-top: 1px solid var(--rule); }
+.history__item > a, .history__item > audio { grid-row: span 2; }
+.history__item > audio { grid-column: 1 / -1; width: 100%; }
+.history__item .thumb { width: 64px; }
+.history__meta { margin: 4px 0; font-variant-numeric: tabular-nums; }
 /* A target without a pick: outline only. */
 .pick.is-empty .plate { box-shadow: inset 0 0 0 1px var(--rule); }
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_140000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -117,8 +117,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
     t.float "run_seconds"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["subject_id", "variant_id"], name: "index_picks_on_subject_id_and_variant_id", unique: true
+    t.boolean "current", default: false, null: false
+    t.integer "user_id"
+    t.datetime "canon_at"
+    t.integer "canon_by_id"
+    t.index "subject_id, IFNULL(variant_id, 0)", name: "index_picks_one_canon_per_target", unique: true, where: "canon_at IS NOT NULL"
+    t.index "subject_id, IFNULL(variant_id, 0)", name: "index_picks_one_current_per_target", unique: true, where: "current"
+    t.index ["canon_by_id"], name: "index_picks_on_canon_by_id"
     t.index ["subject_id"], name: "index_picks_on_subject_id"
+    t.index ["user_id"], name: "index_picks_on_user_id"
     t.index ["variant_id"], name: "index_picks_on_variant_id"
   end
 
@@ -206,6 +213,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
   add_foreign_key "notes", "entries"
   add_foreign_key "notes", "users"
   add_foreign_key "picks", "subjects"
+  add_foreign_key "picks", "users"
+  add_foreign_key "picks", "users", column: "canon_by_id"
   add_foreign_key "picks", "variants"
   add_foreign_key "sessions", "users"
   add_foreign_key "subjects", "entries"

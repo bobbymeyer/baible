@@ -29,19 +29,20 @@ RSpec.describe "Exporting picks", type: :request do
     expect(response.media_type).to eq("application/json")
     expect(response.headers["Content-Disposition"]).to include("attachment", "cid-#{pick.seed}.json")
     sidecar = JSON.parse(response.body)
-    expect(sidecar.keys).to eq(%w[baible file content_type byte_size sha256 medium project kind entry subject variant seed prompt negative model family
+    expect(sidecar.keys).to eq(%w[baible file content_type byte_size sha256 medium project kind entry subject variant picked_by canon canon_by canon_at seed prompt negative model family
                                   loras width height transparent lyrics seconds source workflow run_seconds picked_at recipe])
     expect(sidecar).to include(
       "baible" => 1, "file" => "cid-#{pick.seed}.png", "content_type" => "image/png", "medium" => "image",
       "sha256" => Digest::SHA256.hexdigest(pick.file.download), "byte_size" => pick.file.byte_size,
       "project" => "The Drowned Coast", "kind" => "Portrait", "entry" => nil, "subject" => "Cid", "variant" => nil,
+      "picked_by" => @user.email_address, "canon" => false, "canon_by" => nil, "canon_at" => nil,
       "seed" => pick.seed, "model" => "anima-preview.safetensors", "family" => "anima", "loras" => [],
       "width" => 1024, "height" => 1024, "transparent" => false, "lyrics" => nil, "seconds" => nil, "source" => nil, "run_seconds" => 42.5
     )
     expect(sidecar["prompt"]).to eq("masterpiece, best quality, ink wash, a head and shoulders portrait, facing the viewer, centered, plain background, Cid, white beard")
     expect(sidecar["workflow"]).to start_with("UNETLoader → CLIPLoader")
     expect(sidecar["recipe"]).to eq(pick.recipe)
-    expect(Time.iso8601(sidecar["picked_at"])).to be_within(1.second).of(pick.updated_at)
+    expect(Time.iso8601(sidecar["picked_at"])).to be_within(1.second).of(pick.created_at)
   end
 
   it "lists every current pick in the project's manifest, with where to download each" do

@@ -37,7 +37,7 @@
                 <span class="plate <%= 'plate--audio' if kind.audio? %>" aria-hidden="true"><%= subject.name.first unless kind.audio? %></span>
               <% end %>
               <strong><%= subject.name %></strong>
-              <small><%= "#{subject.entry.name} · " if subject.entry && subject.entry.name != subject.name %><%= pluralize(subject.picks.size, "pick") %><%= " of #{subject.variants.size + 1}" if subject.variants.any? %></small>
+              <small><%= "#{subject.entry.name} · " if subject.entry && subject.entry.name != subject.name %><%= pluralize(subject.picked_targets, "pick") %><%= " of #{subject.variants.size + 1}" if subject.variants.any? %></small>
             <% end %>
           </li>
         <% end %>

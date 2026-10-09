@@ -6,9 +6,10 @@ ComfyUI from layered recipes, picked by a person, and handed on as files. Rails 
 This document is the design contract. Read it before writing code. Where it conflicts with a
 shortcut, the document wins until Bobby changes it.
 
-**Status.** Everything here is built except what is marked **Planned**: picks with history and
-canon (section 5, "Picks: history and canon") and the LoRA loop (section 6). Build those in that
-order: a training set is chosen from kept picks, so the history comes first.
+**Status.** Everything here is built except what is marked **Planned**: the LoRA loop (section 6)
+and the language model's part in running unknown models and building workflows (section 4,
+"Unknown models and new workflows"). Picks with history and canon, which the loop chooses its
+sets from, are built.
 
 ## 1. What it is
 
@@ -25,6 +26,9 @@ order: a training set is chosen from kept picks, so the history comes first.
   LoRA on them, and that LoRA then makes the assets. Its output can feed the next version. The
   entry's look and the model sheet are where this starts, not where it ends.
 - Images (any ComfyUI image model the app can recognise, see "Workflows") and audio (ACE-Step).
+- **Model agnostic.** baible works with whatever models the user's ComfyUI has, not a list it
+  ships with. What it knows about a model is data (a family), never code, and an optional local
+  language model helps it learn models and workflows it doesn't know yet (section 4).
 - It came out of polychrome, a JRPG tabletop app, whose asset pipeline it is. polychrome is still
   its first customer: it makes polychrome's art and music. Both projects keep their own scope.
 
@@ -50,7 +54,7 @@ Project ─┬─ Kind ──────────┐            (a kind belo
          │    └─ Training               (Planned: one LoRA training run, from the entry's picks)
          └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry)
                 Subject / Variant ─── Batch ─── Candidate        (rounds of generation)
-                Subject / Variant ─── Pick (one per target; Planned: a history, one current, one canon)
+                Subject / Variant ─── Pick (a history per target: one current, at most one canon)
 SiteSetting (one row)   User ─ Session
 ```
 
@@ -64,9 +68,8 @@ SiteSetting (one row)   User ─ Session
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
 | `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants | `recipe` (frozen at start), `status`, `error`, `submitted_at` |
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
-| `Pick` | The chosen file for a target, and how it was made. One per target; picking again replaces it | `seed`, `prompt`, `recipe`, `run_seconds`, attached `file` |
+| `Pick` | A chosen file for a target, and how it was made. Kept: a target has a history, one `current` pick and at most one canon pick (section 5) | `seed`, `prompt`, `recipe`, `run_seconds`, `user` (who picked it), `current`, `canon_at`, `canon_by` (a user), attached `file` |
 | `SiteSetting` | Where ComfyUI and the language model are, default models, draft tuning | see section 7 |
-| **Planned:** `Pick` additions | Who picked it, and whether it is current or canon (section 5) | `user`, `current`, `canon_at`, `canon_by` (a user) |
 | **Planned:** `Entry` additions | The word its LoRA is trained to answer to | `trigger` |
 | **Planned:** `Training` | One LoRA training run for an entry, frozen at start like a recipe (section 6) | `entry`, `version`, `status`, `error`, `model`, `family`, `settings`, `items` (`[{ pick_id, sha256, caption }]`), `lora` (the file), `comfy_prompt_id`, `run_seconds` |
 
@@ -143,6 +146,35 @@ at a time), with the fewest nodes that do the job:
 - ComfyUI is reached over plain HTTP, with an optional bearer token, headers or basic auth in the
   URL (`Remote::Connection`), so it can be anywhere. Secrets never go in the database or messages.
 
+### Unknown models and new workflows (Planned)
+
+Model agnostic is a rule: no model needs a code change. Today a model whose name no family
+matches runs by where its file is, with generic settings, which often works and sometimes
+doesn't. The language model (the same optional, OpenAI-compatible one `PromptWriter` uses, local
+first) is to close that gap, as an assistant whose output is checked, not trusted:
+
+- **A family for an unknown model.** Given the model's file name and where it sits, and what the
+  server reports (`/object_info`: loaders, text encoders, VAEs, samplers), it proposes a family
+  entry: how the model loads, its text encoder and VAE, steps, CFG, sampler and scheduler, CLIP
+  skip, quality and negative words, prompt style (tags or prose) and size range.
+- **A workflow the builder can't make.** For what `Comfy::Workflow` doesn't build (a new
+  architecture, ControlNet or pose-sheet graphs, the training graph in section 6), it proposes a
+  ComfyUI graph in API form, with the inputs baible fills in (prompt, seed, size, files) named.
+- **Checked against the server**, node by node, before anyone sees it: every node class exists,
+  every input is one that node takes with a value it accepts, every file is on the server. A
+  proposal that fails is sent back with what failed, a few times at most, then dropped with the
+  reason.
+- **A person accepts it**, seeing the outline and a test render. Accepted, it is saved as data
+  (a family in the database beside `config/comfy.yml`'s, or a stored workflow) and reused as is:
+  the language model is never asked per batch, so a recipe made with it stays reproducible, and
+  the recipe and sidecar record the graph as for any batch.
+- Without a language model, or when it can't help, everything works as now: the builder, the
+  config's families, and the by-folder fallback. The builder stays the first choice wherever it
+  can do the job; the fewest nodes still wins.
+
+Open: which local models are good enough at ComfyUI graphs to be worth it, tried on a few models
+the config doesn't know.
+
 ## 5. Batches, candidates, picks
 
 - **Generate** (`Subjects::BatchesController#create`) first saves the subject layer as written in
@@ -159,27 +191,32 @@ at a time), with the fewest nodes that do the job:
 - **Drafts** (images): rough previews (`draft` in config, or Settings), then "Make this one
   properly" (`Batch.refine!`) re-renders one at full size from the draft image, re-noised by
   `draft.denoise`, with the same seed. "Use the draft" picks it as it is.
-- **Pick** (`Candidate#pick!`): the file becomes the target's `Pick`, with its seed, prompt,
-  recipe and run time; the batch (and its drafts) go.
+- **Pick** (`Candidate#pick!`): the file becomes a new `Pick` of the target, its current one,
+  with its seed, prompt, recipe, run time and who picked it; the batch (and its drafts) go.
 
-### Picks: history and canon (Planned)
+### Picks: history and canon
 
-Today picking again replaces the target's pick, file and all. That loses approved art, and a
-training set needs more than one picture per target. So:
+Picks are kept: approved art must not be lost to a later pick, and a training set needs more than
+one picture per target.
 
-- **Picking keeps.** A new pick becomes the target's **current** pick; the one before stays in the
-  target's history, file and recipe intact, with "Use this again". Picks record who picked them.
-- **Canon** is a deliberate mark, at most one per target: "Approve as canon" records who and when.
+- **Picking keeps.** A new pick becomes the target's **current** pick (`Pick.adopt!`); the one
+  before stays in the target's history, file and recipe intact, and "Use this again"
+  (`Picks::CurrentsController`) makes it current again. One current pick per target, held by a
+  partial unique index.
+- **Canon** is a deliberate mark, at most one per target (also a partial unique index): "Approve as
+  canon" (`Picks::CanonsController`, `Pick#approve!`) records who and when, and takes canon from
+  any other pick of the target; "Unapprove" takes it back.
   A canon pick is not replaced by picking: the new pick becomes current, canon stays, and the
   studio shows both until someone approves the new one. Canon never blocks generating; exploring
   is cheap, overwriting what was approved is not.
-- What stands for a target (the entry page, the project page, the manifest) is its canon pick, or
-  its current one when nothing is canon.
-- **Let go** removes one pick from the history. It is refused (`Refusal`) on a canon pick until
-  that is unapproved, and on a pick that a training run used (section 6), since that run's record
-  would point at nothing.
-- The sidecar gains `picked_by`, `canon` (boolean), `canon_by` and `canon_at`. New keys only, so it
-  stays version 1.
+- What stands for a target (`Subject#pick_for`, `Pick.standing`) is its canon pick, or its current
+  one when nothing is canon: on the studio and entry pages, the project page, the manifest, the
+  picks a chain can start from, and a variant's seed hint. The studio shows it marked Canon or
+  Current, says when a newer pick waits for approval, and lists the whole history under it.
+- **Let go** (`Pick#let_go!`) removes one pick, file and all. It is refused (`Refusal`) on a canon
+  pick until that is unapproved. When the current pick goes, the newest left becomes current.
+  (Planned with section 6: refused too on a pick a training run used.)
+- Who picked and approved is kept as a user; when that account goes, the pick stays, unsigned.
 
 ### Entries and model sheets
 
@@ -265,7 +302,8 @@ Assets leave baible as files. There is no API.
 - `GET /picks/:id/download`: the pick's file, as an attachment (`<subject>[-<variant>]-<seed>.png`,
   or `.mp3`/`.flac`).
 - `GET /picks/:id/sidecar`: its sidecar, `<same stem>.json`.
-- `GET /projects/:id/manifest`: every current pick in the project, as JSON:
+- `GET /projects/:id/manifest`: the pick that stands for each target in the project (its canon,
+  else its current pick), as JSON:
   `{ "baible": 1, "project", "exported_at", "picks": [ <sidecar> + "download_url", "sidecar_url" ] }`.
   No archive (no zip gem): fetch what it lists, signed in.
 
@@ -284,6 +322,9 @@ Every key is always present; what doesn't apply is `null`. `Pick#sidecar`.
 | `project`, `kind`, `subject` | string | Names, where it sits in baible |
 | `entry` | string \| null | The entry the subject depicts, or null |
 | `variant` | string \| null | The variant's name, or null for the subject itself |
+| `picked_by` | string \| null | The email address of whoever picked it; null when unknown or gone |
+| `canon` | boolean | Whether it is its target's canon pick |
+| `canon_by`, `canon_at` | string \| null | Who approved it as canon, and when (ISO 8601, UTC) |
 | `seed` | integer | The sampler seed |
 | `prompt` | string | The positive prompt as sent (for audio, the tags) |
 | `negative` | string \| null | Image only; null when the model takes none |
@@ -297,7 +338,7 @@ Every key is always present; what doesn't apply is `null`. `Pick#sidecar`.
 | `source` | object \| null | When it started from another pick: `{ "label", "crop"?, "denoise" }` |
 | `workflow` | string \| null | The ComfyUI graph's outline, `UNETLoader → CLIPLoader → …` |
 | `run_seconds` | number \| null | Seconds ComfyUI spent on it |
-| `picked_at` | string | ISO 8601, UTC |
+| `picked_at` | string | When it was picked, ISO 8601, UTC |
 | `recipe` | object | The full recipe (section 3), enough to make it again |
 
 ### Into polychrome

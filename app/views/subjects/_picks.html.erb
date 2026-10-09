@@ -1,9 +1,12 @@
-<%# The subject's pick and each variant's: what leaves baible, as a file and a sidecar (docs/HANDOFF.md "Export"). %>
+<%# The pick that stands for the subject and each variant (its canon, or its current one), with the target's history
+    under it: what leaves baible, as a file and a sidecar (docs/HANDOFF.md "Picks: history and canon", "Export"). %>
 <% targets = [ nil, *subject.variants ] %>
 <ul class="picks">
   <% targets.each do |variant| %>
+    <% history = subject.target_picks(variant) %>
     <% pick = subject.pick_for(variant) %>
-    <li class="pick <%= 'is-empty' unless pick %>" id="<%= variant ? dom_id(variant, :pick) : 'pick_subject' %>">
+    <% waiting = history.find { |p| p.current? && !p.canon? } if pick&.canon? %>
+    <li class="pick <%= 'is-empty' unless pick %> <%= 'is-canon' if pick&.canon? %>" id="<%= variant ? dom_id(variant, :pick) : 'pick_subject' %>">
       <figure>
         <% if pick&.image? %>
           <%= link_to url_for(pick.file), target: "_blank", rel: "noopener" do %><%= image_tag url_for(pick.file), alt: pick.title, class: "thumb" %><% end %>
@@ -16,21 +19,47 @@
         <figcaption>
           <strong><%= variant ? variant.name : subject.name %></strong>
           <% if pick %>
+            <span class="pick__state"><%= pick.canon? ? "Canon" : "Current" %></span>
             Seed <%= pick.seed %><%= tag.span(" · #{run_time(pick.run_seconds)}", class: "muted") if pick.run_seconds %>
+            <% if pick.canon? %>
+              <span class="muted">Approved by <%= pick.canon_by&.email_address || "someone no longer here" %></span>
+            <% end %>
+            <% if waiting %>
+              <span class="muted">A newer pick (seed <%= waiting.seed %>) waits for approval, in the history.</span>
+            <% end %>
           <% else %>
             <span class="muted">Nothing picked yet</span>
           <% end %>
         </figcaption>
       </figure>
       <% if pick %>
-        <div class="pick__links">
-          <%= link_to "Download", pick_download_path(pick), data: { turbo: false } %>
-          <%= link_to "Sidecar", pick_sidecar_path(pick), data: { turbo: false }, title: "How it was made, as JSON" %>
-          <%= button_to "Let go", pick_path(pick), method: :delete, class: "link-button", form: { class: "inline", data: { turbo_confirm: "Let #{pick.title}'s pick go?" } } %>
-        </div>
+        <%= render "subjects/pick_actions", pick: pick %>
         <details>
           <summary>How it was made</summary>
           <%= render "subjects/recipe", recipe: pick.recipe %>
+        </details>
+      <% end %>
+      <% if history.size > 1 %>
+        <details class="history">
+          <summary>History (<%= history.size %>)</summary>
+          <ol class="history__list">
+            <% history.each do |old| %>
+              <li class="history__item <%= 'is-canon' if old.canon? %>" id="<%= dom_id(old) %>">
+                <% if old.image? %>
+                  <%= link_to url_for(old.file), target: "_blank", rel: "noopener" do %><%= image_tag url_for(old.file), alt: "Seed #{old.seed}", class: "thumb", loading: "lazy" %><% end %>
+                <% elsif old.audio? %>
+                  <audio controls preload="none" src="<%= url_for(old.file) %>"></audio>
+                <% end %>
+                <p class="history__meta">
+                  <% if old.canon? %><span class="pick__state">Canon</span><% end %>
+                  <% if old.current? %><span class="pick__state">Current</span><% end %>
+                  Seed <%= old.seed %>
+                  <span class="muted"><%= old.user&.email_address || "someone" %>, <time datetime="<%= old.created_at.utc.iso8601 %>"><%= time_ago_in_words(old.created_at) %> ago</time></span>
+                </p>
+                <%= render "subjects/pick_actions", pick: old, history: true %>
+              </li>
+            <% end %>
+          </ol>
         </details>
       <% end %>
     </li>

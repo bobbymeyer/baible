@@ -75,13 +75,16 @@ RSpec.describe "The studio: generating and picking", type: :request do
     follow_redirect!
     expect(response.body).to include("Goblin has a new pick (seed #{winner.seed})", "Download", "Sidecar")
 
-    # Picking again replaces it.
+    # Picking again makes the new one current; the first stays in the history.
     again = finish(generate(count: 1), comfy).candidates.sole
     post candidate_pick_path(again)
-    expect(goblin.picks.count).to eq(1)
+    expect(goblin.picks.count).to eq(2)
     expect(goblin.pick_for(nil).seed).to eq(again.seed)
+    expect(goblin.pick_for(nil).user).to eq(@user)
 
     delete pick_path(goblin.pick_for(nil))
+    expect(goblin.reload.pick_for(nil)).to eq(pick) # the one before takes its place
+    delete pick_path(pick)
     expect(goblin.picks.reload).to be_empty
   end
 

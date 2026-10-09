@@ -46,8 +46,12 @@ Rails.application.routes.draw do
   end
 
   # What leaves baible: a pick's file and its sidecar (docs/HANDOFF.md "Export").
+  # A pick from the history used again (current), or approved as its
+  # target's canon; letting one go (destroy).
   resources :picks, only: :destroy do
     scope module: :picks do
+      resource :current, only: :create
+      resource :canon, only: %i[create destroy]
       resource :download, only: :show
       resource :sidecar, only: :show
     end

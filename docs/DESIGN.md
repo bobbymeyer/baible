@@ -39,6 +39,8 @@ The stylesheet is `app/assets/stylesheets/application.css`, taken from polychrom
 | A subject or target with no pick | An outlined square plate (a `?`, or the subject's initial) |
 | Audio with no picture | A filled black circle in the plate |
 | Transparency | A light checkerboard behind the image |
+| A canon pick | A heavy (3px) black frame inside the picture, and the word CANON in small caps |
+| The current pick | The word CURRENT in small caps, no frame |
 | A candidate still rendering | `…`, blinking in two steps (still, under reduced motion) |
 | Something you can't press now (Generate with ComfyUI away) | Hatched, not just greyed |
 | The current page in the masthead | A small black square before its name |

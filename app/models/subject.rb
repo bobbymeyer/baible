@@ -9,7 +9,7 @@
 #
 # A batch makes candidates for the subject itself or for one of its
 # variants (the target), and the one picked is kept, with how it was made,
-# as that target's Pick.
+# as one of that target's Picks.
 class Subject < ApplicationRecord
   belongs_to :project
   belongs_to :kind
@@ -32,10 +32,22 @@ class Subject < ApplicationRecord
     super(ArtDirection.loras(value))
   end
 
-  # The pick for the subject itself (variant nil) or a variant.
+  # What stands for the subject itself (variant nil) or a variant: its
+  # canon pick, or its current one (docs/HANDOFF.md "Picks: history and
+  # canon").
   def pick_for(variant = nil)
-    picks.loaded? ? picks.find { |pick| pick.variant_id == variant&.id } : picks.find_by(variant_id: variant&.id)
+    target = target_picks(variant)
+    target.find(&:canon?) || target.find(&:current?)
   end
+
+  # Every pick of a target, newest first: its history.
+  def target_picks(variant = nil)
+    rows = picks.loaded? ? picks.select { |pick| pick.variant_id == variant&.id } : picks.where(variant_id: variant&.id).to_a
+    rows.sort_by { |pick| [ pick.created_at, pick.id ] }.reverse
+  end
+
+  # How many of its targets (itself and each variant) have a pick.
+  def picked_targets = picks.map(&:variant_id).uniq.size
 
   # The newest round for a target, if any.
   def batch_for(variant = nil)

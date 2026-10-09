@@ -1,34 +1,86 @@
 # frozen_string_literal: true
 
-# The chosen file for a subject or one of its variants (docs/HANDOFF.md
-# "Batches, candidates, picks"), with how it was made: the seed, the prompt
-# and the full recipe, including the workflow's outline. One per target;
-# picking again replaces it. It is what leaves baible: downloaded with its
-# sidecar (#sidecar, docs/HANDOFF.md "Export"), and a batch can start from
-# it (a chain).
+# A chosen file for a subject or one of its variants (docs/HANDOFF.md
+# "Picks: history and canon"), with how it was made: the seed, the prompt
+# and the full recipe, including the workflow's outline, and who picked it.
+#
+# Picks are kept. A target has a history: the newest pick is its current
+# one, and at most one is canon, approved by someone. What stands for the
+# target (#standing) is its canon pick, or its current one. It is what
+# leaves baible: downloaded with its sidecar (#sidecar, docs/HANDOFF.md
+# "Export"), and a batch can start from it (a chain).
 class Pick < ApplicationRecord
   # The sidecar's format; bump it when a field changes meaning or goes.
   SIDECAR_VERSION = 1
 
   belongs_to :subject
   belongs_to :variant, optional: true
+  belongs_to :user, optional: true
+  belongs_to :canon_by, class_name: "User", optional: true
   has_one_attached :file
 
-  validates :variant_id, uniqueness: { scope: :subject_id }
   validate :variant_is_the_subjects
 
   scope :images, -> { joins(file_attachment: :blob).where("active_storage_blobs.content_type LIKE 'image/%'") }
+  scope :newest_first, -> { order(created_at: :desc, id: :desc) }
+  scope :of_target, ->(subject, variant) { where(subject: subject, variant: variant) }
 
-  # A candidate's file and how it was made, as its target's pick.
-  def self.adopt!(candidate)
+  # What stands for each target: its canon pick, or its current one when
+  # nothing is canon. picks: a target's picks, or several targets'.
+  def self.standing(picks)
+    picks.group_by { |pick| [ pick.subject_id, pick.variant_id ] }
+         .filter_map { |_, rows| rows.find(&:canon?) || rows.find(&:current?) }
+  end
+
+  # A candidate's file and how it was made, as its target's new current
+  # pick. The pick before it stays, in the history; canon stays canon.
+  def self.adopt!(candidate, user: nil)
     batch = candidate.batch
-    pick = find_or_initialize_by(subject: batch.subject, variant: batch.variant)
     transaction do
-      pick.file.attach(io: StringIO.new(candidate.file.download), filename: candidate.file.filename.to_s,
-                       content_type: candidate.file.content_type, identify: false)
-      pick.update!(seed: candidate.seed, prompt: batch.recipe["positive"], recipe: batch.recipe, run_seconds: candidate.run_seconds)
+      of_target(batch.subject, batch.variant).where(current: true).update_all(current: false, updated_at: Time.current)
+      new(subject: batch.subject, variant: batch.variant, user: user, current: true, seed: candidate.seed,
+          prompt: batch.recipe["positive"], recipe: batch.recipe, run_seconds: candidate.run_seconds).tap do |pick|
+        pick.file.attach(io: StringIO.new(candidate.file.download), filename: candidate.file.filename.to_s,
+                         content_type: candidate.file.content_type, identify: false)
+        pick.save!
+      end
     end
-    pick
+  end
+
+  def canon? = canon_at.present?
+
+  # The other picks of the same target, newest first.
+  def target_picks = Pick.of_target(subject_id, variant_id).newest_first
+
+  # Use this again: it becomes its target's current pick.
+  def make_current!
+    transaction do
+      target_picks.where(current: true).where.not(id: id).update_all(current: false, updated_at: Time.current)
+      update!(current: true)
+    end
+  end
+
+  # Approve it as its target's canon, in place of any other.
+  def approve!(user)
+    transaction do
+      target_picks.where.not(canon_at: nil).where.not(id: id).update_all(canon_at: nil, canon_by_id: nil, updated_at: Time.current)
+      update!(canon_at: Time.current, canon_by: user)
+    end
+  end
+
+  def unapprove!
+    update!(canon_at: nil, canon_by: nil)
+  end
+
+  # Let it go from the history. Canon is unapproved first, on purpose. When
+  # it was current, the newest pick left takes its place.
+  def let_go!
+    raise Refusal, "#{title}'s canon pick can't be let go: unapprove it first" if canon?
+
+    transaction do
+      destroy!
+      target_picks.first&.update!(current: true) if current?
+    end
   end
 
   def image? = file.attached? && file.content_type.to_s.start_with?("image/")
@@ -60,6 +112,10 @@ class Pick < ApplicationRecord
       "entry" => subject.entry&.name,
       "subject" => subject.name,
       "variant" => variant&.name,
+      "picked_by" => user&.email_address,
+      "canon" => canon?,
+      "canon_by" => canon_by&.email_address,
+      "canon_at" => canon_at&.utc&.iso8601,
       "seed" => seed,
       "prompt" => prompt,
       "negative" => recipe["negative"].presence,
@@ -74,7 +130,7 @@ class Pick < ApplicationRecord
       "source" => recipe["source"]&.slice("label", "crop")&.merge("denoise" => recipe["denoise"]),
       "workflow" => recipe["workflow"],
       "run_seconds" => run_seconds,
-      "picked_at" => updated_at&.utc&.iso8601,
+      "picked_at" => created_at&.utc&.iso8601,
       "recipe" => recipe
     }
   end

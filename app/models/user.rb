@@ -6,6 +6,8 @@ class User < ApplicationRecord
   has_secure_password
   has_many :sessions, dependent: :destroy
   has_many :notes, dependent: :nullify
+  has_many :picks, dependent: :nullify
+  has_many :canon_picks, class_name: "Pick", foreign_key: :canon_by_id, inverse_of: :canon_by, dependent: :nullify
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 

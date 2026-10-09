@@ -35,11 +35,12 @@ class Candidate < ApplicationRecord
     update!(status: "failed", error: e.message)
   end
 
-  # Use this one: it becomes the target's pick, and the batch is cleared.
-  def pick!
+  # Use this one: it becomes the target's current pick (the one before stays
+  # in its history), and the batch is cleared.
+  def pick!(user: nil)
     raise Refusal, "That candidate has nothing to pick yet" unless status == "done" && file.attached?
 
-    pick = Pick.adopt!(self)
+    pick = Pick.adopt!(self, user: user)
     batch.drafts&.destroy!
     batch.destroy!
     pick

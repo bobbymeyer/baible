@@ -95,14 +95,18 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
    and **Generate** for the subject, one variant, or every variant. Drafts first by default for
    images: "Make this one properly" renders the one you like at full quality from the draft.
    Candidates appear as they land, for everyone watching.
-6. **Use this** picks a candidate: it becomes the subject's (or variant's) pick, with its seed and
-   recipe.
+6. **Use this** picks a candidate: it becomes the subject's (or variant's) current pick, with its
+   seed, recipe and who picked it. Earlier picks stay in its **history** ("Use this again").
+   **Approve as canon** marks the one that's approved; a later pick doesn't replace canon until
+   someone approves it, and canon can't be let go until it's unapproved. What stands for a target
+   everywhere (the bible, the manifest, chains) is its canon pick, else its current one.
 7. **Chains:** a batch can start from any image pick in the project, the whole picture or only the
    head cut from a full-body figure. Sprite, then a portrait from its head, then every expression
    from the portrait: the same face throughout.
 
 Every pick has **Download** (the file) and **Sidecar** (how it was made, as JSON; the schema is in
-HANDOFF "Export"). The project's **Manifest** lists every current pick with where to download each.
+HANDOFF "Export"). The project's **Manifest** lists the pick that stands for each target (canon,
+else current) with where to download each.
 
 ## Bringing assets into polychrome
 

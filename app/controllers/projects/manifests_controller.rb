@@ -1,13 +1,15 @@
 # frozen_string_literal: true
 
-# Every current pick in a project, as one JSON document (docs/HANDOFF.md
-# "Export"): each pick's sidecar with where to download its file and
-# sidecar. No archive: fetch the files it lists.
+# The pick that stands for each target in a project (its canon, or its
+# current pick), as one JSON document (docs/HANDOFF.md "Export"): each
+# pick's sidecar with where to download its file and sidecar. No archive:
+# fetch the files it lists.
 class Projects::ManifestsController < ApplicationController
   include ProjectScoped
 
   def show
-    picks = @project.picks.includes(:variant, subject: :kind, file_attachment: :blob).order(:subject_id, :variant_id)
+    picks = Pick.standing(@project.picks.includes(:variant, :user, :canon_by, subject: %i[kind entry], file_attachment: :blob)
+                                        .order(:subject_id, :variant_id))
     manifest = {
       "baible" => Pick::SIDECAR_VERSION,
       "project" => @project.name,

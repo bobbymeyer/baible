@@ -13,7 +13,7 @@
       <article class="card">
         <h2><%= link_to project.name, project_path(project) %></h2>
         <p class="muted"><%= project.description.presence || project.style.presence || "No house style yet." %></p>
-        <p class="hint"><%= pluralize(project.kinds.size, "kind") %> · <%= pluralize(project.subjects.count, "subject") %> · <%= pluralize(project.picks.count, "pick") %></p>
+        <p class="hint"><%= pluralize(project.kinds.size, "kind") %> · <%= pluralize(project.subjects.count, "subject") %> · <%= pluralize(project.picks.where(current: true).count, "pick") %></p>
       </article>
     <% end %>
   </div>
