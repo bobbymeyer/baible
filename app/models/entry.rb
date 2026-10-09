@@ -14,6 +14,7 @@ class Entry < ApplicationRecord
   belongs_to :project
   belongs_to :training, optional: true # the run whose LoRA it uses
   has_many :subjects, dependent: :nullify
+  has_many :standing_orders, dependent: :destroy
   has_many :trainings, -> { order(version: :desc) }, dependent: :destroy, inverse_of: :entry
   has_many :notes, -> { order(created_at: :desc, id: :desc) }, dependent: :destroy, inverse_of: :entry
 

@@ -6,9 +6,9 @@ ComfyUI from layered recipes, picked by a person, and handed on as files. Rails 
 This document is the design contract. Read it before writing code. Where it conflicts with a
 shortcut, the document wins until Bobby changes it.
 
-**Status.** Everything here is built except what is marked **Planned**: the night shift's
-standing orders (section 7), and the language model's part in running unknown models and
-building workflows (section 4, "Unknown models and new workflows"). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
+**Status.** Everything here is built except what is marked **Planned**: the language model's part
+in running unknown models and building workflows (section 4, "Unknown models and new
+workflows"), and the parts of section 7 marked so (renting a GPU, a pushed morning summary). The LoRA loop (section 6) is built but not yet tried against a real ComfyUI; its
 open questions are listed there.
 
 ## 1. What it is
@@ -63,6 +63,7 @@ SiteSetting (one row)   User ─ Session
 | `Project` | A world or setting; the top layer | `name` (unique), `description` (never in a prompt), `style`, `negative`, `model`, `loras`, `sound` |
 | `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets` |
 | `Entry` | One thing in the world across kinds (Cid; the harbour town); the entry layer, between kind and subject | `name` (unique in its project), `look`, `loras`, `lore` (never in a prompt), `trigger` (for its next LoRA), `training` (the run whose LoRA it uses) |
+| `StandingOrder` | Work the night shift plans for itself every night (section 7) | `project`, `kind`, `entry` (both optional), `user`, `action` (`fill_gaps`, `until_canon`, `train`), `count`, `nightly_limit`, `min_pictures`, `model`, `enabled`, `planned_at`, `report` |
 | `Note` | A note on an entry: a question, a decision, a note to whoever draws it next. Never in a prompt | `entry`, `user` (null once their account goes), `body` |
 | `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
@@ -337,9 +338,31 @@ made unattended, for review in the morning (`NightShift`, `NightShiftJob`, `Nigh
   tonight" to take a batch or run off it, and what the night made: its batches still waiting for a
   pick (the studio's strips, Use this included), and training runs that finished or failed in the
   last day.
-- **Planned, not built:** standing orders (every night, fill the gaps: a batch for each target
-  without a pick, more candidates for those without canon); training on a rented GPU from the same
-  queue; a morning summary pushed somewhere rather than waiting to be looked at.
+- **Planned, not built:** training on a rented GPU from the same queue; a morning summary pushed
+  somewhere rather than waiting to be looked at.
+
+### Standing orders
+
+Work the night shift plans for itself (`StandingOrder`), kept under "Every night" on the
+Overnight page. Each belongs to a project, may be narrowed to one kind and/or one entry, can be
+switched off, and does one thing:
+
+| Action | Every night |
+| --- | --- |
+| Fill the gaps | a batch (`count` candidates) for every target in scope with no pick |
+| Keep going until canon | a batch for every target in scope with picks but none approved |
+| Train when ready (needs an entry) | a training run, once the entry has `min_pictures` canon image picks and they aren't exactly what its last run trained on; on the order's `model`, else `training.model`; captions from each pick's recipe (`Training.caption_for`); never while its last run is still scheduled or training |
+
+- **Planned once a night**, at the first tick after the window opens (`NightShift.plan!`; each
+  order keeps `planned_at`), so its batches are frozen from the layers as they are that night and
+  queue after whatever was queued by hand. Then the night shift lets them go like any other.
+- **Unreviewed work doesn't pile up.** A target that still has a night batch (queued, made and not
+  picked from, or failed and not discarded) gets nothing new, and an order queues at most
+  `nightly_limit` batches a night.
+- **What it did** is kept as one line (`report`) beside it: "Queued 3 batches of 4; 1 target still
+  waiting for review of an earlier night's", "Waiting for 12 canon pictures; Cid has 7", "No base
+  model to train on". That line is the morning's answer to "why didn't it make anything?".
+- Deleting a project, kind or entry deletes its orders.
 
 ## 8. Settings
 

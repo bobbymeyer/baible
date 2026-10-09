@@ -15,6 +15,7 @@ class Kind < ApplicationRecord
 
   belongs_to :project
   has_many :subjects, dependent: :restrict_with_error
+  has_many :standing_orders, dependent: :destroy
 
   normalizes :name, :prompt, :negative, :model, with: ->(value) { value.to_s.strip.presence }
 
