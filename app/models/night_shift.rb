@@ -10,8 +10,9 @@
 # the window is open, nothing of baible's is with ComfyUI (queued, waiting
 # or running), and ComfyUI's own queue is empty (it may be busy with work
 # from elsewhere). Generations go first, oldest first; training runs, which
-# take hours, after them. The first tick of each night plans the standing
-# orders' share (StandingOrder), queued after what was queued by hand; the
+# take hours, after them. A run for the training host (a rented GPU) goes on
+# its own track, as soon as the host is free. The first tick of each night
+# plans the standing orders' share (StandingOrder), queued after what was queued by hand; the
 # first after the window closes writes the morning summary (NightSummary).
 module NightShift
   Window = Data.define(:start, :finish, :zone) do
@@ -87,9 +88,11 @@ module NightShift
   def queued_batches = Batch.where(status: "scheduled").order(:id)
   def queued_trainings = Training.where(status: "scheduled").order(:updated_at, :id)
 
-  # Anything of baible's with ComfyUI, or on its way.
+  # Anything of baible's with this ComfyUI, or on its way (a run on the
+  # training host doesn't count).
   def busy?
-    Batch.where(status: %w[queued waiting running]).exists? || Training.where(status: %w[queued waiting running]).exists?
+    Batch.where(status: %w[queued waiting running]).exists? ||
+      Training.where(host: "local", status: %w[queued waiting running]).exists?
   end
 
   # One tick: let the next scheduled thing go, when it may. Returns what was
@@ -101,13 +104,15 @@ module NightShift
     end
 
     plan!(at)
-    release!(client)
+    remote = release_remote!
+    local = release_local!(client)
+    local.is_a?(Symbol) && remote ? remote : local
   end
 
-  # The next thing: generations, then training runs.
-  def release!(client)
+  # The next local thing: generations, then runs that train here.
+  def release_local!(client)
     batch = queued_batches.first
-    training = queued_trainings.first unless batch
+    training = queued_trainings.where(host: "local").first unless batch
     return :nothing_queued unless batch || training
     return :busy if busy?
     return :comfy_busy unless client.queue_size.zero?
@@ -117,6 +122,17 @@ module NightShift
   rescue Comfy::Error => e
     Rails.logger.info("[night shift] ComfyUI isn't answering: #{e.message}")
     :comfy_unreachable
+  end
+
+  # A run for the training host goes as soon as the host has nothing of
+  # baible's: it doesn't wait for this ComfyUI, and this ComfyUI doesn't
+  # wait for it.
+  def release_remote!
+    training = queued_trainings.where(host: "remote").first or return
+    return if Training.where(host: "remote", status: %w[queued waiting running]).exists?
+
+    training.train!
+    training
   end
 
   # The morning summary of the night that last closed, once (NightSummary).

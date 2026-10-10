@@ -35,12 +35,13 @@ Rails.application.routes.draw do
   end
 
   # A training run: training a kept set (run), the entry using its LoRA or
-  # not (use), its set as a .tar (set), and deleting it.
+  # not (use), its set as a .tar (set), its LoRA file (lora), and deleting it.
   resources :trainings, only: :destroy do
     scope module: :trainings do
       resource :run, only: %i[create destroy]
       resource :use, only: %i[create destroy]
       resource :set, only: :show
+      resource :lora, only: :show
     end
   end
 

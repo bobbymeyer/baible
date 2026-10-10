@@ -42,6 +42,26 @@ shared: &shared
     start: "23:00"
     end: "07:00"
     zone: <%= ENV.fetch("NIGHT_TIME_ZONE", "UTC").to_json %>
+  # A second ComfyUI to train LoRAs on instead of this one (Comfy::Training,
+  # docs/HANDOFF.md "Training hosts"): a rented GPU, or a GPU box on the
+  # tailnet. Blank trains here. Its token and headers stay in the environment
+  # (TRAINING_COMFY_TOKEN, TRAINING_COMFY_HEADERS). A RunPod pod is started
+  # before a run and stopped after it when RUNPOD_API_KEY (environment only)
+  # and its id are set, so it costs only while it trains.
+  training_host:
+    url: <%= ENV.fetch("TRAINING_COMFY_URL", "").to_json %>
+    token: <%= ENV.fetch("TRAINING_COMFY_TOKEN", "").to_json %>
+    headers: <%= ENV.fetch("TRAINING_COMFY_HEADERS", "{}").to_json %>
+    runpod_pod_id: <%= ENV.fetch("RUNPOD_POD_ID", "").to_json %>
+    # How long a started pod gets to bring ComfyUI up before a run fails.
+    boot_minutes: 20
+  # Where baible puts a trained LoRA so this ComfyUI can use it: a directory
+  # inside baible that is one of ComfyUI's LoRA folders (mounted into the
+  # container), and that folder's name as ComfyUI lists it. Blank keeps the
+  # LoRA in baible only, to download.
+  trained_loras:
+    dir: <%= ENV.fetch("TRAINED_LORA_DIR", "").to_json %>
+    prefix: <%= ENV.fetch("TRAINED_LORA_PREFIX", "baible").to_json %>
   # Training a LoRA on an entry's picks (Comfy::Training, docs/HANDOFF.md
   # "The LoRA loop"), with ComfyUI's own training nodes. These are starting
   # points for a character from a couple of dozen pictures; a family can

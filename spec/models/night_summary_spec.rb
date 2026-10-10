@@ -39,6 +39,15 @@ RSpec.describe NightSummary do
     expect(NightSummary.count).to eq(1)
   end
 
+  it "puts a pod left running first" do
+    entry = project.entries.create!(name: "Cid")
+    entry.trainings.new(version: 1, trigger: "cidx", model: "m", family: "sdxl", items: [ { "pick_id" => 1 } ], status: "done", lora: "baible/c.safetensors",
+                        host: "remote", host_note: "RunPod didn't stop pod p (down): stop it by hand, it's costing money.", updated_at: night).save!(touch: false)
+    text = NightSummary.write!(Time.utc(2026, 10, 9, 23), Time.utc(2026, 10, 10, 7)).text
+    expect(text.lines.map(&:chomp)).to eq([ "NEEDS YOU: Cid v1: RunPod didn't stop pod p (down): stop it by hand, it's costing money.",
+                                            "Trained Cid v1 on the training host: baible/c.safetensors." ])
+  end
+
   it "reports training without a batch line when only training ran, and links the Overnight page" do
     stub_const("ENV", ENV.to_h.merge("APP_URL" => "https://baible.example/"))
     entry = project.entries.create!(name: "Cid")

@@ -3,8 +3,8 @@
 # The morning summary (docs/HANDOFF.md "The morning summary"): one a night,
 # written at the first tick after the window closes, of what that night did:
 # what was made and failed, what waits for review, training runs, the
-# standing orders' reports, and what wasn't reached. Kept for the Overnight
-# page, and
+# standing orders' reports, what wasn't reached, and anything that needs a
+# person now (a rented pod left running). Kept for the Overnight page, and
 # sent to MORNING_WEBHOOK_URL when it's set (Webhook), so it reaches a phone
 # rather than waiting to be looked at. A send that fails is kept with its
 # reason; it is not retried.
@@ -26,6 +26,7 @@ class NightSummary < ApplicationRecord
     batches = Batch.where(night: true, released_at: window).includes(:candidates, :variant, subject: :project)
     candidates = batches.flat_map(&:candidates)
     runs = Training.where(updated_at: window).or(Training.where(status: %w[queued waiting running])).includes(:entry)
+    stuck = Training.where.not(host_note: nil).where(updated_at: window).includes(:entry)
     {
       "night" => { "opened_at" => opened.utc.iso8601, "closed_at" => closed.utc.iso8601 },
       "batches" => { "made" => batches.count { |b| b.status == "done" }, "failed" => batches.count { |b| b.status == "failed" },
@@ -38,16 +39,19 @@ class NightSummary < ApplicationRecord
       "training" => runs.filter_map do |run|
         next unless run.status.in?(%w[done failed queued waiting running])
 
-        { "run" => run.title, "status" => run.status, "lora" => run.lora, "error" => run.error }
+        { "run" => run.title, "status" => run.status, "lora" => run.lora, "error" => run.error, "host" => run.host }
       end,
+      "attention" => stuck.map { |run| "#{run.title}: #{run.host_note}" },
       "orders" => StandingOrder.where(planned_at: window).includes(:project, :kind, :entry).map { |o| "#{o.label}, #{o.where}: #{o.report}" },
       "url" => (ENV["APP_URL"].present? ? "#{ENV['APP_URL'].chomp('/')}/night" : nil)
     }
   end
 
-  # The summary as a few plain lines, what was made first.
+  # The summary as a few plain lines: what needs a person first, then what
+  # was made.
   def self.words(p)
     lines = []
+    Array(p["attention"]).each { |line| lines << "NEEDS YOU: #{line}" }
     b = p["batches"]
     batches = b["made"] + b["failed"] + b["still_running"]
     if batches.zero? && p["training"].empty?
@@ -62,7 +66,7 @@ class NightSummary < ApplicationRecord
     p["failures"].first(5).each { |line| lines << "Failed: #{line}" }
     p["training"].each do |run|
       lines << case run["status"]
-      when "done" then "Trained #{run['run']}: #{run['lora']}."
+      when "done" then "Trained #{run['run']}#{' on the training host' if run['host'] == 'remote'}: #{run['lora']}."
       when "failed" then "Training #{run['run']} failed: #{run['error']}"
       else "Training #{run['run']} is still going."
       end

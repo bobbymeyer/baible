@@ -49,7 +49,7 @@
         <% end %>
         <% @queued_trainings.each do |run| %>
           <tr id="<%= dom_id(run) %>">
-            <td><%= link_to "Train #{run.title}", entry_path(run.entry, anchor: "lora") %><br><small class="muted">a LoRA, on <%= run.model %></small></td>
+            <td><%= link_to "Train #{run.title}", entry_path(run.entry, anchor: "lora") %><br><small class="muted">a LoRA, on <%= run.model %><%= ", on the training host" if run.remote? %></small></td>
             <td><%= run.entry.project.name %></td>
             <td><%= pluralize(run.items.size, "picture") %>, <%= run.settings["steps"] %> steps</td>
             <td><%= button_to "Not tonight", training_run_path(run), method: :delete, class: "link-button" %></td>
