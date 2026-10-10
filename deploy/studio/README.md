@@ -80,7 +80,7 @@ through a reboot.
 
 1. **Merge to `main` first.** `deploy-apps.sh` takes a branch per app, and a
    generated `claude/...` branch name would then live in the script for ever.
-2. `mkdir -p ~/stacks/baible && cd ~/stacks/baible`, clone `bobbymeyer/baible`
+2. `mkdir -p ~/stacks/baible ~/comfy-models/loras/baible && cd ~/stacks/baible`, clone `bobbymeyer/baible`
    into `app/` on `main`, copy `app/deploy/studio/compose.yaml` up one level.
 3. Make `.env` without the key touching scrollback:
    `( umask 077; printf 'SECRET_KEY_BASE=%s\n' "$(openssl rand -hex 64)" > .env )`
@@ -157,25 +157,61 @@ database are unnamed PNGs.
 
 ## ComfyUI side
 
-- **Trained LoRAs land in ComfyUI's output folder** (`SaveLoRA`). Add it to
-  the LoRA folders in `~/stacks/comfyui/extra_model_paths.yaml` (the file the
-  runbook already uses for `~/comfy-models`), then kickstart ComfyUI:
-
-  ```yaml
-  baible:
-      base_path: /Users/bobby/stacks/comfyui/output
-      loras: loras
-  ```
-
+- **Trained LoRAs come home by themselves.** baible fetches each one from the
+  ComfyUI that trained it, here or on a rented GPU, and writes it to
+  `/rails/loras`, which the compose file mounts from
+  `~/comfy-models/loras/baible`. ComfyUI lists it as `baible/<name>.safetensors`
+  with nothing to configure, and "Download the LoRA" on the run has a copy.
+  **Check once** that a file the container writes there (uid 1000) can be read
+  by ComfyUI running as bobby: colima's virtiofs mount usually maps ownership,
+  but that's a hypothesis until a LoRA has gone through.
 - **Training on this machine is the expensive path.** A run holds ComfyUI's
   queue for hours, shares 64GB with llama-swap and openjev, and runs on MPS.
   The runbook's own rule ("CUDA-dependent or bandwidth-hungry: rent it")
-  applies: "Download the set (.tar)" on a run gives a kohya-layout set for a
-  rented GPU, and the LoRA it makes goes into `~/comfy-models/loras`. Try
-  ComfyUI's own training once, on SDXL, to learn what it costs here.
+  applies: see "A rented GPU" below. Try ComfyUI's own training here once, on
+  SDXL, to learn what it costs.
 - **baible writes into ComfyUI's input folder**: chain sources and draft
   refinements as single PNGs, training sets under `input/baible/train/`. It
   never cleans them up. Worth a look after a few training runs.
+
+## A rented GPU
+
+For training, so the Studio's GPU stays on generating. A RunPod pod running
+ComfyUI, with its training nodes (`TrainLoraNode`, `SaveLoRA`,
+`LoadImageTextDataSetFromFolder`, `MakeTrainingDataset`, `ResolutionBucket`)
+and the SDXL base model kept on the pod's volume **under the same file name as
+on the Studio**, since a run names the model it trains on.
+
+1. Create the pod once from a ComfyUI template, install what's above, check it
+   trains, and stop it. A stopped pod keeps its volume and costs only storage.
+2. Uncomment the three lines in `.env` (env.example): `TRAINING_COMFY_URL` is
+   the pod's ComfyUI through RunPod's proxy,
+   `https://<pod id>-8188.proxy.runpod.net`; `RUNPOD_POD_ID` its id;
+   `RUNPOD_API_KEY` a key from RunPod's settings. `docker compose up -d` to
+   pick them up.
+3. The training form then offers "The training host" first. Each run starts
+   the pod, waits up to 20 minutes for its ComfyUI, uploads the set, trains,
+   brings the LoRA home, and stops the pod, whether the run succeeded or not.
+   Overnight, a run for the pod goes as soon as the pod is free, while the
+   Studio goes on with the night's generations.
+
+What to watch:
+
+- **A pod left running costs money.** If baible ever can't stop it, the run's
+  page says so and it's the first line of the morning summary ("NEEDS YOU").
+  Stop it in RunPod's console.
+- **The pod's ComfyUI is unauthenticated** behind its proxy address, which is
+  the only thing keeping it private: the runbook's blast-radius posture for
+  ComfyUI, on a machine someone else owns. baible stops it when it isn't
+  training; keep nothing on it you'd mind losing. If the pod sits behind a
+  proxy that wants a token, `TRAINING_COMFY_TOKEN` or `TRAINING_COMFY_HEADERS`
+  in `.env` carry it.
+- Not yet measured: how long the pod takes to bring ComfyUI back, what an SDXL
+  character LoRA costs there, and whether uploading a set through the proxy is
+  reliable. The first run settles all three.
+
+Without the three lines, training stays on the Studio, and the LoRA still
+comes home into `~/comfy-models/loras/baible`.
 
 ## Operating
 

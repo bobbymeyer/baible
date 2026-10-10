@@ -29,6 +29,13 @@ services:
       RAILS_MAX_THREADS: "5"
       # Picks and candidates in their own volume, apart from the databases.
       ACTIVE_STORAGE_ROOT: /rails/files
+      # Trained LoRAs are fetched back from whichever ComfyUI trained them
+      # and written here: ComfyUI's own LoRA folder for baible (the mount
+      # below), where it lists them as baible/<name>.safetensors.
+      TRAINED_LORA_DIR: /rails/loras
+      TRAINED_LORA_PREFIX: baible
+      # The training host (a rented GPU) is in .env, as the env.example
+      # beside this file says: its address and RunPod key are secrets.
       COMFY_URL: http://host.docker.internal:8188
       # Krea 2 Turbo is the image model the Studio has. For drafts and looks;
       # characters train on SDXL once it's installed (COMFY_TRAINING_MODEL).
@@ -48,6 +55,9 @@ services:
     volumes:
       - baible_storage:/rails/storage # the four SQLite databases
       - baible_files:/rails/files     # Active Storage: picks, candidates
+      # ComfyUI's LoRAs live in ~/comfy-models, outside its checkout; this is
+      # the folder of them baible writes to. Make it before the first up.
+      - /Users/bobby/comfy-models/loras/baible:/rails/loras
     # /health reads the users table (HealthController): /up answers as soon
     # as Rails boots, and the signed-out redirect never touches SQLite, so
     # neither is anything for deploy-apps.sh to roll back on.
