@@ -305,7 +305,8 @@ knows kinds that derive from kinds, subjects that derive from subjects, and shee
   `BatchJob` at once, without ComfyUI, as one candidate, and picked like any other: it has a
   history, canon and a sidecar (`medium: "sheet"`, with the plan in its recipe). A picture gone
   since the plan fails the batch, saying which. A sheet is never a training picture, a chain's
-  start, nor a standing order's target. Where libvips has no fonts, it is laid out unlabelled.
+  start, nor a standing order's target. Its labels need a font (the Docker image installs
+  `fonts-dejavu-core`); where libvips has none, it is laid out unlabelled.
 
 ### Variants and chains
 
