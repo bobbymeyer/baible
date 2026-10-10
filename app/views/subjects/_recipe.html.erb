@@ -1,5 +1,13 @@
 <%# One recipe, as ComfyUI will get it (apart from the seed). preview: also build the workflow against what ComfyUI
     has installed now, to show its nodes or what's missing. %>
+<% if recipe["medium"] == "sheet" %>
+  <dl class="facts">
+    <dt>Sheet</dt><dd><%= recipe.dig("sheet", "title") %><%= ", #{recipe['width']} × #{recipe['height']}" if recipe["width"] %>, laid out by baible</dd>
+    <% Array(recipe.dig("sheet", "rows")).each do |row| %>
+      <dt><%= row["label"] %></dt><dd><%= row["cells"].map { |cell| cell["label"] }.join(", ") %></dd>
+    <% end %>
+  </dl>
+<% else %>
 <% audio = recipe["medium"] == "audio" %>
 <% model = recipe["model"] || recipe["checkpoint"] %>
 <% family = Comfy::Family.find(recipe["family"], model) unless audio %>
@@ -34,3 +42,4 @@
     <% end %>
   <% end %>
 </dl>
+<% end %>

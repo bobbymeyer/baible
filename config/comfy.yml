@@ -247,8 +247,26 @@ shared: &shared
   # kind's framing comes after the project's sound. `variants` are the
   # detail layers each new subject of the kind starts with (a portrait's
   # expressions), each name with the words it adds.
+  #
+  # `from` derives a kind from one above it (docs/HANDOFF.md "Derived kinds
+  # and sheets"): each subject of it is of a subject of that kind, takes its
+  # words, LoRAs and entry, and starts from its picture as `derive` says
+  # (words, picture or head; `derive_denoise`, else `chain`). A `sheet`
+  # lays out the picks of a subject and what derives from it as one picture,
+  # from the kinds in `sheet_of` (all of them when absent).
   kinds:
+    # The character itself, as designed: what everything of it derives from.
+    - name: Character
+      medium: image
+      prompt: "a single figure, full body, standing, facing the viewer, relaxed neutral pose, centered, plain white background"
+      negative: "multiple people, cropped, text, dynamic pose"
+      width: 832
+      height: 1216
+      transparent: false
     - name: Character sprite
+      from: Character
+      derive: picture
+      derive_denoise: 0.6
       medium: image
       prompt: "a single figure, full body, standing, facing the viewer, centered, plain white background"
       negative: "multiple people, cropped, text"
@@ -256,6 +274,8 @@ shared: &shared
       height: 1216
       transparent: true
     - name: Portrait
+      from: Character
+      derive: head
       medium: image
       prompt: "a head and shoulders portrait, facing the viewer, centered, plain background"
       negative: "multiple people, cropped head, text, hands"
@@ -273,7 +293,12 @@ shared: &shared
     # one by one rather than as one crowded sheet): the face gets the room,
     # both three-quarter views carry what's on one side only (a scar, a
     # tattoo), and a few full-body views give the build and clothes.
+    #
+    # From words, not the character's picture: a back view can't be redrawn
+    # from a front one. The entry's look, and its LoRA once trained, hold it.
     - name: Model sheet
+      from: Character
+      derive: words
       medium: image
       prompt: "character reference, a single figure, even studio lighting, plain white background"
       negative: "multiple people, cropped, text, dynamic pose"
@@ -287,6 +312,23 @@ shared: &shared
         full body front: "full body, standing straight, arms at sides, front view"
         full body side: "full body, standing straight, side view, profile"
         full body back: "full body, standing straight, back view, from behind"
+    # Another outfit, redrawn from the character's picture: each costume is a
+    # subject of its own ("Cid, winter coat"), and can have its own portrait,
+    # sprite and sheet.
+    - name: Costume
+      from: Character
+      derive: picture
+      derive_denoise: 0.7
+      medium: image
+      prompt: "the same character in a different outfit, a single figure, full body, standing, facing the viewer, centered, plain white background"
+      negative: "multiple people, cropped, text"
+      width: 832
+      height: 1216
+      transparent: false
+    # The character and everything derived from it, laid out as one picture.
+    - name: Character design sheet
+      from: Character
+      medium: sheet
     - name: Creature
       medium: image
       prompt: "a single monster, full body, standing, profile view facing left, centered, plain white background"

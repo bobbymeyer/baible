@@ -1,0 +1,39 @@
+<%# The subjects derived from this one, kind by kind (docs/HANDOFF.md "Derived kinds and sheets"), and making one in a
+    kind that has none of it yet. subject; kinds: Subject#derivable_kinds. %>
+<% derived = subject.derived_subjects.includes(:kind, :picks).group_by(&:kind) %>
+<ul class="subject-grid">
+  <% kinds.each do |kind| %>
+    <% (derived[kind] || []).sort_by { |s| s.name.downcase }.each do |child| %>
+      <% pick = child.pick_for(nil) %>
+      <li class="subject-tile">
+        <%= link_to subject_path(child) do %>
+          <% if pick&.image? %>
+            <%= image_tag url_for(pick.file), alt: "", class: "thumb", loading: "lazy" %>
+          <% else %>
+            <span class="plate" aria-hidden="true"><%= kind.name.first %></span>
+          <% end %>
+          <strong><%= kind.name %></strong>
+          <small><%= child.name unless child.name == subject.name %><%= " · " unless child.name == subject.name %><%= pluralize(child.picked_targets, "pick") %><%= " of #{child.variants.size + 1}" if child.variants.any? %></small>
+        <% end %>
+      </li>
+    <% end %>
+    <% unless derived[kind] %>
+      <li class="subject-tile is-empty">
+        <span class="plate" aria-hidden="true"><%= kind.name.first %></span>
+        <strong><%= kind.name %></strong>
+        <%= button_to kind.sheet? ? "Make the sheet" : "Make one", subject_derivations_path(subject), params: { kind_id: kind.id }, class: "link-button" %>
+      </li>
+    <% end %>
+  <% end %>
+</ul>
+<div class="actions">
+  <% if kinds.any? { |kind| !derived[kind] } %>
+    <%= button_to "Make one of every kind", subject_derivations_path(subject), params: { kind_id: "every" }, class: "button" %>
+  <% end %>
+  <%= link_to "Another, with its own name", new_project_subject_path(subject.project, parent_id: subject.id), class: "button button--quiet" %>
+</div>
+<p class="hint">
+  Each takes <%= subject.name %>'s words, LoRAs and entry before its own, and, where its kind says so, starts from <%= subject.name %>'s
+  picture (<%= link_to "Kinds", project_kinds_path(subject.project) %>). One named as <%= subject.name %> is made in a click; a costume or a
+  second version needs a name of its own.
+</p>

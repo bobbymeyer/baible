@@ -1,4 +1,5 @@
-<%# A kind: the middle layer of its subjects' recipes. The medium decides which fields show (kind-switch). %>
+<%# A kind: the middle layer of its subjects' recipes, maybe derived from another, or a sheet. The medium decides which
+    fields show (kind-switch). %>
 <%= form_with model: [ project, kind ], class: "form", data: { controller: "kind-switch" } do |f| %>
   <%= render "shared/errors", record: kind %>
   <%= render "shared/installed" %>
@@ -11,12 +12,40 @@
       <% if kind.persisted? && kind.subjects.any? %><p class="hint">Fixed once it has subjects.</p><% end %>
     </div>
   </div>
-  <div class="field">
-    <%= f.label :prompt, "Framing" %>
-    <%= f.text_area :prompt, rows: 2 %>
-    <%= tag.p class: "hint", data: { show_for: "image" }, hidden: !kind.image? do %>How this kind is framed, after the house style: “a single monster, full body, profile view, plain white background”.<% end %>
-    <%= tag.p class: "hint", data: { show_for: "audio" }, hidden: !kind.audio? do %>Tags after the project's sound: “battle theme, fast, drums, loopable”.<% end %>
-  </div>
+  <% parents = project.kinds.select { |other| other.image? && other != kind && (kind.new_record? || other.ancestors.exclude?(kind)) } %>
+  <%= tag.fieldset class: "bare", data: { show_for: "image sheet" }, hidden: kind.audio?, disabled: kind.audio? do %>
+    <div class="field">
+      <%= f.label :parent_id, kind.sheet? ? "A sheet of" : "Derives from" %>
+      <%= f.select :parent_id, parents.map { |other| [ other.name, other.id ] }, include_blank: "Nothing: a kind of its own" %>
+      <p class="hint">
+        Derived, each subject of this kind is of one of that kind's subjects (Cid's portrait, of Cid the character), taking its words,
+        LoRAs and entry. A sheet lays out the picks of one subject of it and what derives from that.
+      </p>
+    </div>
+  <% end %>
+  <%= tag.fieldset class: "bare", data: { show_for: "image audio" }, hidden: kind.sheet?, disabled: kind.sheet? do %>
+    <div class="field">
+      <%= f.label :prompt, "Framing" %>
+      <%= f.text_area :prompt, rows: 2 %>
+      <%= tag.p class: "hint", data: { show_for: "image" }, hidden: !kind.image? do %>How this kind is framed, after the house style: “a single monster, full body, profile view, plain white background”.<% end %>
+      <%= tag.p class: "hint", data: { show_for: "audio" }, hidden: !kind.audio? do %>Tags after the project's sound: “battle theme, fast, drums, loopable”.<% end %>
+    </div>
+  <% end %>
+  <%= tag.fieldset class: "bare", data: { show_for: "sheet" }, hidden: !kind.sheet?, disabled: !kind.sheet? do %>
+    <div class="field">
+      <span class="label">What it lays out</span>
+      <%= hidden_field_tag "kind[sheet_kind_ids][]", "", id: nil %>
+      <div class="checks">
+        <% (kind.parent ? kind.parent.lineage : project.kinds).select { |other| other.image? && other != kind }.each do |other| %>
+          <span class="field--check">
+            <%= check_box_tag "kind[sheet_kind_ids][]", other.id, kind.sheet_kind_ids.include?(other.id), id: "kind_sheet_kind_#{other.id}" %>
+            <%= label_tag "kind_sheet_kind_#{other.id}", other.name %>
+          </span>
+        <% end %>
+      </div>
+      <p class="hint">Of the kind it's a sheet of and those derived from it; none ticked lays out all of them. Each target's canon pick, else its current one, a row for each subject.</p>
+    </div>
+  <% end %>
   <%= tag.fieldset class: "bare", data: { show_for: "image" }, hidden: !kind.image?, disabled: !kind.image? do %>
     <div class="field">
       <%= f.label :negative %>
@@ -31,6 +60,21 @@
         <%= f.label :transparent, "Remove the background" %>
       </div>
     </div>
+    <div class="field-row">
+      <div class="field">
+        <%= f.label :derive, "Its subjects start from" %>
+        <%= f.select :derive, Kind::DERIVE.invert %>
+      </div>
+      <div class="field">
+        <%= f.label :derive_denoise, "Re-noise" %>
+        <%= f.number_field :derive_denoise, min: 0.1, max: 1, step: 0.05, placeholder: Comfy.config.fetch(:chain, {})[:denoise].to_s %>
+      </div>
+    </div>
+    <p class="hint">
+      For a derived kind: its parent subject's words alone, or redrawing its picture (or the head cut from it, for a portrait from a full figure), once
+      it has one; the studio can choose otherwise. A variant redraws its own subject's picture. Blank re-noise is
+      <%= Comfy.config.fetch(:chain, {})[:head_denoise] %> for a head, <%= Comfy.config.fetch(:chain, {})[:denoise] %> otherwise.
+    </p>
     <%= render "shared/model_field", name: "kind[model]", id: "kind_model", value: kind.model, inherited: project.model.presence || Comfy.config[:model] %>
     <% workflows = LearnedWorkflow.accepted.order(:name) %>
     <% if workflows.any? || kind.learned_workflow %>
@@ -49,11 +93,13 @@
     </div>
     <%= render "shared/model_field", name: "kind[model]", id: "kind_audio_model", value: kind.model, inherited: Comfy::Music.default_model, audio: true %>
   <% end %>
-  <div class="field">
-    <%= f.label :variant_presets, "Variants each new subject starts with" %>
-    <%= f.text_area :variant_presets, value: kind.variant_presets_text, rows: 4, placeholder: "happy: smiling happily\nsad: sad expression, downcast eyes" %>
-    <p class="hint">One a line: a name, a colon, and the words it adds after the subject.</p>
-  </div>
+  <%= tag.fieldset class: "bare", data: { show_for: "image audio" }, hidden: kind.sheet?, disabled: kind.sheet? do %>
+    <div class="field">
+      <%= f.label :variant_presets, "Variants each new subject starts with" %>
+      <%= f.text_area :variant_presets, value: kind.variant_presets_text, rows: 4, placeholder: "happy: smiling happily\nsad: sad expression, downcast eyes" %>
+      <p class="hint">One a line: a name, a colon, and the words it adds after the subject.</p>
+    </div>
+  <% end %>
   <div class="actions">
     <%= f.submit kind.new_record? ? "Add the kind" : "Save", class: "button button--primary" %>
     <%= link_to "Cancel", project_kinds_path(project), class: "button button--quiet" %>

@@ -117,7 +117,7 @@ class Pick < ApplicationRecord
       "canon" => canon?,
       "canon_by" => canon_by&.email_address,
       "canon_at" => canon_at&.utc&.iso8601,
-      "seed" => seed,
+      "seed" => (seed unless medium == "sheet"),
       "prompt" => prompt,
       "negative" => recipe["negative"].presence,
       "model" => recipe["model"],
