@@ -84,6 +84,14 @@ settings, and the `kinds` a new project starts with. A model's file name picks i
 `match` to teach it a new name, or a family for a new architecture that loads the same way.
 `config/llm.yml` holds the language model's.
 
+A model no family knows can also be learned without editing the file: on **Models and
+workflows** (from Settings), "Ask the language model" has it propose a family, checked against
+this ComfyUI; "Try it" makes a test render, and once you **Accept** it, baible uses it for that
+model. The same page has the language model write a whole ComfyUI graph from a description (a
+ControlNet pose, a new architecture), checked node by node; accepted, a kind can make its pictures
+with it (the kind's page). You can edit what it wrote as JSON. It's asked only then, never per
+batch. HANDOFF "Unknown models and new workflows" has the details.
+
 ## Using it
 
 1. **Make a project** (a world): its house style, negative prompt, model and LoRAs for images, and
@@ -191,6 +199,7 @@ polychrome's expressions, the subject itself being Neutral), Scene (scene panels
 | `app/models/project.rb`, `kind.rb`, `entry.rb`, `subject.rb`, `variant.rb` | The layers; `Subject#recipe` composes them |
 | `app/models/batch.rb`, `candidate.rb`, `pick.rb`, `app/jobs/batch_job.rb` | Generating, collecting, picking; `Pick#sidecar` |
 | `app/models/comfy/`, `remote.rb`, `llm/`, `prompt_writer.rb` | ComfyUI and the language model over HTTP, workflow building |
+| `app/models/learned_family.rb`, `learned_workflow.rb`, `trial.rb`, `family_writer.rb`, `workflow_writer.rb`, `comfy/*_check.rb` | Families and workflows the language model writes, checked, tried and accepted |
 | `app/models/cutout.rb`, `headshot.rb` | Background removal and its mending; the head cut for chains |
 | `app/models/site_setting.rb`, `connection_check.rb` | Settings and the step-by-step connection check |
 | `app/controllers/subjects/`, `candidates/`, `picks/`, `projects/` | Nested resources (verbs as resources) |

@@ -49,6 +49,32 @@ class FakeComfy
 
   def run_seconds(id) = (42.5 if @done.include?(id))
 
+  # Node definitions as /object_info gives them, for learned workflows: a
+  # spec gives its own, or gets a small set.
+  attr_writer :definitions
+
+  def definitions = @definitions ||= FakeComfy.definitions
+
+  def node_definitions(names) = definitions.slice(*names)
+
+  def object_info = definitions
+
+  def self.definitions
+    {
+      "CheckpointLoaderSimple" => { "input" => { "required" => { "ckpt_name" => [ [ "sdxl.safetensors" ] ] } }, "output" => %w[MODEL CLIP VAE] },
+      "CLIPTextEncode" => { "input" => { "required" => { "text" => [ "STRING", { "multiline" => true } ], "clip" => [ "CLIP" ] } }, "output" => %w[CONDITIONING] },
+      "EmptyLatentImage" => { "input" => { "required" => { "width" => [ "INT", { "min" => 16, "max" => 8192 } ], "height" => [ "INT", { "min" => 16, "max" => 8192 } ],
+                                                           "batch_size" => [ "INT", { "min" => 1, "max" => 64 } ] } }, "output" => %w[LATENT] },
+      "KSampler" => { "input" => { "required" => { "model" => [ "MODEL" ], "seed" => [ "INT", { "min" => 0 } ], "steps" => [ "INT", { "min" => 1, "max" => 10_000 } ],
+                                                   "cfg" => [ "FLOAT", { "min" => 0.0, "max" => 100.0 } ], "sampler_name" => [ %w[euler dpmpp_2m] ],
+                                                   "scheduler" => [ %w[normal karras] ], "positive" => [ "CONDITIONING" ], "negative" => [ "CONDITIONING" ],
+                                                   "latent_image" => [ "LATENT" ], "denoise" => [ "FLOAT", { "min" => 0.0, "max" => 1.0 } ] } }, "output" => %w[LATENT] },
+      "VAEDecode" => { "input" => { "required" => { "samples" => [ "LATENT" ], "vae" => [ "VAE" ] } }, "output" => %w[IMAGE] },
+      "SaveImage" => { "input" => { "required" => { "images" => [ "IMAGE" ], "filename_prefix" => [ "STRING", { "default" => "ComfyUI" } ] } }, "output" => [] },
+      "ControlNetLoader" => { "input" => { "required" => { "control_net_name" => [ [ "openpose_sdxl.safetensors" ] ] } }, "output" => %w[CONTROL_NET] }
+    }
+  end
+
   # Prompts ComfyUI has from elsewhere (queue_size), as set by a spec.
   attr_writer :queue_size
 

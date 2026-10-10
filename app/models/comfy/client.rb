@@ -98,6 +98,21 @@ module Comfy
       Capabilities.unreachable(@remote.unreachable(e), offline: true)
     end
 
+    # How ComfyUI defines some of its nodes ({ class => definition }); a
+    # node it doesn't have is left out.
+    def node_definitions(names)
+      @remote.session do
+        names.uniq.each_with_object({}) do |node, found|
+          definition = get_json("/object_info/#{ERB::Util.url_encode(node)}")[node]
+          found[node] = definition if definition
+        end
+      end
+    end
+
+    # Every node this ComfyUI has, with its definition (/object_info: can
+    # run to megabytes; asked for only when writing a workflow).
+    def object_info = get_json("/object_info")
+
     def reachable?
       get_json("/system_stats")
       true

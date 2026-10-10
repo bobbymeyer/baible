@@ -188,6 +188,13 @@ form.inline, form.button_to { display: inline; margin: 0; }
 .training-set__item { display: grid; grid-template-columns: auto 96px 1fr; gap: 0 12px; align-items: start; padding: 8px 0; border-top: 1px solid var(--rule); }
 .training-set__item .thumb { width: 96px; }
 
+/* Models and workflows: each learned one, its trial, and the language model's log. */
+.learnable { padding: 16px 0 24px; border-top: 1px solid var(--rule); }
+.learnable__trial { margin: 8px 0; }
+.learnable__trial .thumb { width: 256px; }
+textarea.code, pre.log { font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 18px; }
+pre.log { white-space: pre-wrap; max-height: 320px; overflow: auto; background: var(--wash); padding: 8px; }
+
 /* Notes on an entry: a log, newest first, a hairline between each. */
 .notes { list-style: none; margin: 24px 0 0; padding: 0; }
 .note { padding: 8px 0 16px; border-top: 1px solid var(--rule); }

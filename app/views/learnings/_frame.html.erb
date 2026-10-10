@@ -1,0 +1,110 @@
+<%# The page's content, in a frame that reloads as proposals and trials move on (Learnable#refresh_watchers). %>
+<% caps = Comfy.capabilities %>
+<% families = @families || LearnedFamily.includes(trials: { image_attachment: :blob }).order(:label) %>
+<% workflows = @workflows || LearnedWorkflow.includes(:kinds, trials: { image_attachment: :blob }).order(:name) %>
+<%= turbo_frame_tag "learning", data: { src: learning_path(frame: 1) } do %>
+  <section class="window" id="models">
+    <h2>Models on ComfyUI</h2>
+    <% if !caps.reachable? %>
+      <p class="empty">ComfyUI isn't answering, so its models can't be listed.</p>
+    <% else %>
+      <table class="table">
+        <thead><tr><th scope="col">Model</th><th scope="col">Runs as</th><th scope="col"></th></tr></thead>
+        <tbody>
+          <% caps.models.sort_by(&:downcase).each do |model| %>
+            <% slug = Comfy::Family.match(model) %>
+            <% learned = families.find { |f| f.model == model } %>
+            <tr>
+              <td><code><%= model %></code></td>
+              <td>
+                <% if slug %>
+                  <% family = Comfy::Family.new(slug, model) %>
+                  <%= family.label %><small class="muted"> · <%= family.learned? ? "learned" : "config/comfy.yml" %></small>
+                <% else %>
+                  <%= Comfy::Family.for(model, capabilities: caps).label %><small class="muted"> · unknown: by where its file is</small>
+                  <% if learned %><br><small class="muted">a learned family is <%= learned.status %></small><% end %>
+                <% end %>
+              </td>
+              <td>
+                <% unless slug %>
+                  <%= button_to learned ? "Ask again" : "Ask the language model", learned_families_path(model: model), class: "link-button",
+                                form: { class: "inline", data: { turbo_frame: "_top" } }, disabled: !Llm.enabled? %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </section>
+
+  <section class="window" id="families">
+    <h2>Learned families</h2>
+    <% if families.empty? %><p class="empty">None yet: ask about an unknown model above.</p><% end %>
+    <% families.each do |family| %>
+      <div class="learnable" id="<%= dom_id(family) %>">
+        <h3><%= family.label %> <small class="muted">for <code><%= family.model %></code></small></h3>
+        <%= render "learnings/state", learnable: family %>
+        <% if family.settings.any? %>
+          <%= form_with url: learned_family_path(family), method: :patch, class: "form", data: { turbo_frame: "_top" } do %>
+            <div class="field"><%= label_tag "label_#{family.id}", "Name" %><%= text_field_tag :label, family.label, id: "label_#{family.id}" %></div>
+            <div class="field">
+              <%= label_tag "settings_#{family.id}", "Settings" %>
+              <%= text_area_tag :settings, JSON.pretty_generate(family.settings), rows: 12, id: "settings_#{family.id}", class: "code" %>
+              <p class="hint">As a family in <code>config/comfy.yml</code>. Saving checks it against this ComfyUI and sends it back to proposed.</p>
+            </div>
+            <div class="actions"><%= submit_tag "Save", class: "button button--quiet" %></div>
+          <% end %>
+        <% end %>
+        <p class="actions">
+          <%= button_to "Delete", learned_family_path(family), method: :delete, class: "link-button",
+                        form: { class: "inline", data: { turbo_frame: "_top", turbo_confirm: "Delete #{family.label}?" } } %>
+        </p>
+      </div>
+    <% end %>
+  </section>
+
+  <section class="window" id="workflows">
+    <h2>Learned workflows</h2>
+    <%= form_with url: learned_workflows_path, class: "form", data: { turbo_frame: "_top" } do %>
+      <div class="field-row">
+        <div class="field"><%= label_tag :name, "Name" %><%= text_field_tag :name, nil, required: true, placeholder: "Pose sheet" %></div>
+        <div class="field field--wide">
+          <%= label_tag :purpose, "What it should do" %>
+          <%= text_area_tag :purpose, nil, rows: 2, required: true,
+                            placeholder: "Draw {{prompt}} in the pose of the picture given as {{source_image}}, with the OpenPose ControlNet, at {{width}} by {{height}}" %>
+        </div>
+      </div>
+      <p class="hint">
+        The language model picks nodes from everything this ComfyUI has and writes the graph, with baible's placeholders where a batch's values go
+        (<code><%= Comfy::Template::PLACEHOLDERS.keys.join(" ") %></code>). Accepted, a kind can make its pictures with it (the kind's page).
+      </p>
+      <div class="actions"><%= submit_tag "Ask the language model", class: "button", disabled: !Llm.enabled? %></div>
+    <% end %>
+    <% workflows.each do |workflow| %>
+      <div class="learnable" id="<%= dom_id(workflow) %>">
+        <h3><%= workflow.name %></h3>
+        <p class="prose"><%= workflow.purpose %></p>
+        <%= render "learnings/state", learnable: workflow %>
+        <% if workflow.graph.any? %>
+          <p><small><code><%= workflow.outline %></code></small><br><small class="muted">Takes <%= workflow.placeholders.join(" ").presence || "nothing of the batch's" %></small></p>
+          <% if workflow.kinds.any? %><p class="hint">Used by <%= workflow.kinds.map(&:name).to_sentence %>.</p><% end %>
+          <%= form_with url: learned_workflow_path(workflow), method: :patch, class: "form", data: { turbo_frame: "_top" } do %>
+            <div class="field">
+              <%= label_tag "graph_#{workflow.id}", "Graph" %>
+              <%= text_area_tag :graph, JSON.pretty_generate(workflow.graph), rows: 14, id: "graph_#{workflow.id}", class: "code" %>
+              <p class="hint">ComfyUI's API form. Saving checks it node by node against this ComfyUI and sends it back to proposed.</p>
+            </div>
+            <div class="actions"><%= submit_tag "Save", class: "button button--quiet" %></div>
+          <% end %>
+        <% end %>
+        <p class="actions">
+          <%= button_to "Ask again", learned_workflows_path(name: workflow.name), class: "link-button",
+                        form: { class: "inline", data: { turbo_frame: "_top" } }, disabled: !Llm.enabled? %>
+          <%= button_to "Delete", learned_workflow_path(workflow), method: :delete, class: "link-button",
+                        form: { class: "inline", data: { turbo_frame: "_top", turbo_confirm: "Delete #{workflow.name}? Kinds using it go back to baible's graph." } } %>
+        </p>
+      </div>
+    <% end %>
+  </section>
+<% end %>

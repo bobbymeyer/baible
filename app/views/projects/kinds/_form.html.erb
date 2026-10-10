@@ -32,6 +32,15 @@
       </div>
     </div>
     <%= render "shared/model_field", name: "kind[model]", id: "kind_model", value: kind.model, inherited: project.model.presence || Comfy.config[:model] %>
+    <% workflows = LearnedWorkflow.accepted.order(:name) %>
+    <% if workflows.any? || kind.learned_workflow %>
+      <div class="field">
+        <%= f.label :learned_workflow_id, "Workflow" %>
+        <%= f.select :learned_workflow_id, (workflows.to_a | [ kind.learned_workflow ].compact).map { |w| [ "#{w.name}#{' (not accepted)' unless w.accepted?}", w.id ] },
+                     include_blank: "Built by baible for the model" %>
+        <p class="hint">A learned workflow (<%= link_to "Models and workflows", learning_path %>) makes this kind's pictures instead: no drafts or background removal of baible's, and a pick to start from only if the workflow takes one.</p>
+      </div>
+    <% end %>
     <%= render "shared/loras", name: "kind[loras]", loras: kind.loras, above: ArtDirection.stack_loras(project.loras) %>
   <% end %>
   <%= tag.fieldset class: "bare", data: { show_for: "audio" }, hidden: !kind.audio?, disabled: !kind.audio? do %>

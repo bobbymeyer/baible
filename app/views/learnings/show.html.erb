@@ -1,0 +1,12 @@
+<% content_for :title, "Models and workflows" %>
+<%= turbo_stream_from :learning %>
+<h1>Models and workflows</h1>
+<p class="prose">
+  baible runs any model ComfyUI has. One <code>config/comfy.yml</code> doesn't know runs by where its file is, with generic settings; here the
+  language model can propose how it should run instead, and write ComfyUI workflows the builder can't make. Everything it proposes is checked
+  against this ComfyUI first, then tried, and baible uses it only once a person accepts it. The language model is never asked during a batch.
+</p>
+<% unless Llm.enabled? %>
+  <p class="alert-text">No language model is set (<%= link_to "Settings", settings_path %>, or <code>LLM_URL</code>): it's what proposes them.</p>
+<% end %>
+<%= render "learnings/frame" %>

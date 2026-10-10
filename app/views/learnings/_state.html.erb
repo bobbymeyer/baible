@@ -1,0 +1,37 @@
+<%# Where a learned family or workflow stands: proposal, trial, acceptance, and the log of what was asked. learnable. %>
+<% trial = learnable.latest_trial %>
+<p class="learnable__state">
+  <strong><%= { "asking" => "The language model is writing it…", "proposed" => "Proposed: passes this ComfyUI's checks",
+                "accepted" => "Accepted: in use", "failed" => "Failed" }.fetch(learnable.status) %></strong>
+  <% if learnable.accepted? && learnable.accepted_at %><small class="muted"> by <%= learnable.accepted_by&.email_address || "someone" %>, <%= time_ago_in_words(learnable.accepted_at) %> ago</small><% end %>
+  <% if learnable.error %><br><span class="alert-text"><%= learnable.error %></span><% end %>
+</p>
+<% if trial %>
+  <figure class="learnable__trial">
+    <% if trial.image.attached? %>
+      <%= image_tag url_for(trial.image), alt: "Test render: #{trial.prompt}", class: "thumb" %>
+    <% else %>
+      <span class="plate" aria-hidden="true">…</span>
+    <% end %>
+    <figcaption>
+      Test render, “<%= trial.prompt %>”, seed <%= trial.seed %>: <%= { "queued" => "queued", "waiting" => "waiting for ComfyUI", "running" => "rendering",
+                                                                       "done" => "done", "failed" => "failed" }.fetch(trial.status) %>
+      <%= tag.span(" · #{run_time(trial.run_seconds)}", class: "muted") if trial.run_seconds %>
+      <% if trial.error %><br><span class="alert-text"><%= trial.error %></span><% end %>
+    </figcaption>
+  </figure>
+<% end %>
+<% if learnable.status.in?(%w[proposed accepted]) %>
+  <div class="actions">
+    <%= form_with url: polymorphic_path([ learnable, :trial ]), class: "inline-form", data: { turbo_frame: "_top" } do %>
+      <%= text_field_tag :prompt, nil, placeholder: Trial::PROMPT, "aria-label": "Test prompt", id: "prompt_#{dom_id(learnable)}" %>
+      <%= submit_tag "Try it", class: "button generate", disabled: !comfy_reachable? %>
+    <% end %>
+    <% if learnable.status == "proposed" && trial&.status == "done" %>
+      <%= button_to "Accept", polymorphic_path([ learnable, :acceptance ]), class: "button", form: { class: "inline", data: { turbo_frame: "_top" } } %>
+    <% end %>
+  </div>
+<% end %>
+<% if learnable.log.present? %>
+  <details><summary>What the language model said</summary><pre class="log"><%= learnable.log %></pre></details>
+<% end %>

@@ -130,7 +130,17 @@ class Subject < ApplicationRecord
       "height" => height,
       "transparent" => kind.transparent,
       "parts" => parts
-    }
+    }.merge(learned_workflow_part)
+  end
+
+  # A kind that makes its pictures with an accepted learned workflow puts its
+  # graph in the recipe, frozen with the rest (docs/HANDOFF.md "Unknown
+  # models and new workflows").
+  def learned_workflow_part
+    workflow = kind.learned_workflow
+    return {} unless workflow&.accepted?
+
+    { "learned_workflow" => { "id" => workflow.id, "name" => workflow.name, "graph" => workflow.graph } }
   end
 
   def audio_recipe(variant = nil)
