@@ -6,6 +6,16 @@ Rails.application.routes.draw do
   # Where ComfyUI and the language model are (SiteSetting), with a check.
   resource :settings, only: %i[show update]
 
+  # Models and workflows the language model learns (docs/HANDOFF.md "Unknown
+  # models and new workflows"): proposed, edited, tried and accepted.
+  resource :learning, only: :show
+  %i[learned_families learned_workflows].each do |learned|
+    resources learned, only: %i[create update destroy] do
+      resource :trial, only: :create, controller: "learnables/trials"
+      resource :acceptance, only: :create, controller: "learnables/acceptances"
+    end
+  end
+
   # Overnight: what's queued for tonight's window, and what last night made,
   # for review (NightShift).
   resource :night, only: :show

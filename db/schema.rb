@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_110000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -99,8 +99,47 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
     t.integer "position", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "learned_workflow_id"
+    t.index ["learned_workflow_id"], name: "index_kinds_on_learned_workflow_id"
     t.index ["project_id", "name"], name: "index_kinds_on_project_id_and_name", unique: true
     t.index ["project_id"], name: "index_kinds_on_project_id"
+  end
+
+  create_table "learned_families", force: :cascade do |t|
+    t.string "slug", null: false
+    t.string "label", null: false
+    t.string "model", null: false
+    t.json "match", default: [], null: false
+    t.json "settings", default: {}, null: false
+    t.string "status", default: "asking", null: false
+    t.text "error"
+    t.text "log"
+    t.integer "user_id"
+    t.integer "accepted_by_id"
+    t.datetime "accepted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["accepted_by_id"], name: "index_learned_families_on_accepted_by_id"
+    t.index ["slug"], name: "index_learned_families_on_slug", unique: true
+    t.index ["user_id"], name: "index_learned_families_on_user_id"
+  end
+
+  create_table "learned_workflows", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "purpose", null: false
+    t.json "graph", default: {}, null: false
+    t.string "outline"
+    t.string "status", default: "asking", null: false
+    t.text "error"
+    t.text "log"
+    t.integer "user_id"
+    t.integer "accepted_by_id"
+    t.datetime "accepted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["accepted_by_id"], name: "index_learned_workflows_on_accepted_by_id"
+    t.index ["name"], name: "index_learned_workflows_on_name", unique: true
+    t.index ["user_id"], name: "index_learned_workflows_on_user_id"
   end
 
   create_table "night_summaries", force: :cascade do |t|
@@ -251,6 +290,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
     t.index ["user_id"], name: "index_trainings_on_user_id"
   end
 
+  create_table "trials", force: :cascade do |t|
+    t.string "learnable_type", null: false
+    t.integer "learnable_id", null: false
+    t.string "status", default: "queued", null: false
+    t.text "error"
+    t.string "prompt", null: false
+    t.integer "seed", null: false
+    t.string "comfy_prompt_id"
+    t.datetime "submitted_at"
+    t.float "run_seconds"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["learnable_type", "learnable_id"], name: "index_trials_on_learnable"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email_address", null: false
     t.string "password_digest", null: false
@@ -277,7 +331,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
   add_foreign_key "candidates", "batches"
   add_foreign_key "entries", "projects"
   add_foreign_key "entries", "trainings"
+  add_foreign_key "kinds", "learned_workflows"
   add_foreign_key "kinds", "projects"
+  add_foreign_key "learned_families", "users"
+  add_foreign_key "learned_families", "users", column: "accepted_by_id"
+  add_foreign_key "learned_workflows", "users"
+  add_foreign_key "learned_workflows", "users", column: "accepted_by_id"
   add_foreign_key "notes", "entries"
   add_foreign_key "notes", "users"
   add_foreign_key "picks", "subjects"

@@ -51,6 +51,13 @@ class Batch < ApplicationRecord
       if subject.image?
         recipe["write"] = write && Llm.enabled?
         recipe["transparent"] = transparent unless transparent.nil?
+        # A learned workflow is its own graph: no drafts, and no background
+        # removal laid over it; a picture to start from only if it takes one.
+        if recipe["learned_workflow"]
+          draft = false
+          recipe["transparent"] = false
+          from = nil unless Comfy::Template.placeholders(recipe.dig("learned_workflow", "graph")).include?("{{source_image}}")
+        end
         if from
           recipe = recipe.merge("source" => { "pick_id" => from.id, "crop" => source["crop"].presence, "label" => from.title }.compact,
                                 "denoise" => denoise.to_f.clamp(0.1, 1.0))
@@ -173,10 +180,11 @@ class Batch < ApplicationRecord
       raise (capabilities.offline? ? Comfy::Unreachable : Comfy::Error), capabilities.error || "ComfyUI isn't answering"
     end
 
+    definitions = learned_definitions(client)
     candidates.each do |candidate|
       next if candidate.comfy_prompt_id
 
-      graph = build(seed: candidate.seed, capabilities: capabilities)
+      graph = build(seed: candidate.seed, capabilities: capabilities, definitions: definitions)
       update!(recipe: recipe.merge("workflow" => Comfy::Workflow.outline(graph))) unless recipe["workflow"]
       candidate.update!(comfy_prompt_id: client.submit(graph), status: "running")
     end
@@ -185,13 +193,34 @@ class Batch < ApplicationRecord
 
   # The graph for one candidate: an image's (Comfy::Workflow) or audio's
   # (Comfy::Music). ComfyUI keeps what it saves in output/baible/.
-  def build(seed:, capabilities:)
+  def build(seed:, capabilities:, definitions: nil)
     prefix = "baible/#{subject.file_stem(variant, seed)}"
     if audio?
       Comfy::Music.build(recipe, seed: seed, prefix: prefix, capabilities: capabilities)
+    elsif recipe["learned_workflow"]
+      learned_graph(seed: seed, prefix: prefix, definitions: definitions)
     else
       Comfy::Workflow.build(recipe, seed: seed, prefix: prefix, capabilities: capabilities)
     end
+  end
+
+  # The recipe's learned workflow, filled for one candidate and checked
+  # against the server's definitions of its nodes before it is queued: a
+  # node, file or choice the server no longer has stops the batch, saying so.
+  def learned_graph(seed:, prefix:, definitions:)
+    values = { "prompt" => recipe["positive"].to_s, "negative" => recipe["negative"].to_s, "seed" => seed,
+               "width" => recipe["width"].to_i, "height" => recipe["height"].to_i, "prefix" => prefix, "model" => recipe["model"] }
+    values["source_image"] = recipe["source_image"] if recipe["source_image"]
+    graph = Comfy::Template.fill(recipe.dig("learned_workflow", "graph"), values)
+    problems = Comfy::GraphCheck.errors(graph, definitions.to_h, template: false)
+    raise Comfy::Error, "The workflow #{recipe.dig('learned_workflow', 'name')} won't run here: #{problems.join('; ')}" if problems.any?
+
+    graph
+  end
+
+  def learned_definitions(client)
+    graph = recipe.dig("learned_workflow", "graph") or return
+    client.node_definitions(graph.values.map { |node| node["class_type"] })
   end
 
   # Collect whatever has finished. Returns true once every candidate has.

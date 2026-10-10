@@ -6,11 +6,10 @@ ComfyUI from layered recipes, picked by a person, and handed on as files. Rails 
 This document is the design contract. Read it before writing code. Where it conflicts with a
 shortcut, the document wins until Bobby changes it.
 
-**Status.** Everything here is built except what is marked **Planned**: the language model's part
-in running unknown models and building workflows (section 4, "Unknown models and new
-workflows"). The LoRA loop (section 6), its training hosts and the night shift (section 7) are
-built but not yet tried against a real ComfyUI or a rented GPU; their open questions are listed
-where they are described.
+**Status.** Everything here is built. The LoRA loop (section 6), its training hosts, the night
+shift (section 7) and the language model's families and workflows (section 4, "Unknown models
+and new workflows") are built but not yet tried against a real ComfyUI, a rented GPU or a local
+language model; their open questions are listed where they are described.
 
 ## 1. What it is
 
@@ -56,15 +55,19 @@ Project ─┬─ Kind ──────────┐            (a kind belo
          └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry)
                 Subject / Variant ─── Batch ─── Candidate        (rounds of generation)
                 Subject / Variant ─── Pick (a history per target: one current, at most one canon)
+LearnedFamily / LearnedWorkflow ─── Trial   (Kind ─ LearnedWorkflow, optional)
 SiteSetting (one row)   User ─ Session
 ```
 
 | Model | What | Columns that matter |
 | --- | --- | --- |
 | `Project` | A world or setting; the top layer | `name` (unique), `description` (never in a prompt), `style`, `negative`, `model`, `loras`, `sound` |
-| `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets` |
+| `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets`, `learned_workflow` (an accepted one, or none for the builder's graph) |
 | `Entry` | One thing in the world across kinds (Cid; the harbour town); the entry layer, between kind and subject | `name` (unique in its project), `look`, `loras`, `lore` (never in a prompt), `trigger` (for its next LoRA), `training` (the run whose LoRA it uses) |
 | `StandingOrder` | Work the night shift plans for itself every night (section 7) | `project`, `kind`, `entry` (both optional), `user`, `action` (`fill_gaps`, `until_canon`, `train`), `count`, `nightly_limit`, `min_pictures`, `model`, `enabled`, `planned_at`, `report` |
+| `LearnedFamily` | A family the language model proposed for a model `config/comfy.yml` doesn't know (section 4) | `slug` (unique, `learned-…`), `label`, `model`, `match`, `settings` (as a config family), `status` (`asking`, `proposed`, `accepted`, `failed`), `error`, `log`, `user`, `accepted_by`, `accepted_at` |
+| `LearnedWorkflow` | A ComfyUI graph the language model wrote from a description, with placeholders (section 4) | `name` (unique), `purpose`, `graph`, `outline`, and the same status columns |
+| `Trial` | A test render of a learned family or workflow | `learnable` (either), `status` (as a batch), `error`, `prompt`, `seed`, `comfy_prompt_id`, `submitted_at`, `run_seconds`, attached `image` |
 | `Note` | A note on an entry: a question, a decision, a note to whoever draws it next. Never in a prompt | `entry`, `user` (null once their account goes), `body` |
 | `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
@@ -150,34 +153,55 @@ at a time), with the fewest nodes that do the job:
 - ComfyUI is reached over plain HTTP, with an optional bearer token, headers or basic auth in the
   URL (`Remote::Connection`), so it can be anywhere. Secrets never go in the database or messages.
 
-### Unknown models and new workflows (Planned)
+### Unknown models and new workflows
 
-Model agnostic is a rule: no model needs a code change. Today a model whose name no family
-matches runs by where its file is, with generic settings, which often works and sometimes
-doesn't. The language model (the same optional, OpenAI-compatible one `PromptWriter` uses, local
-first) is to close that gap, as an assistant whose output is checked, not trusted:
+Model agnostic is a rule: no model needs a code change. A model whose name no family matches runs
+by where its file is, with generic settings, which often works and sometimes doesn't. The
+language model (the same optional, OpenAI-compatible one `PromptWriter` uses, local first) closes
+that gap on the Models and workflows page (`/learning`, from Settings), as an assistant whose
+output is checked, not trusted:
 
-- **A family for an unknown model.** Given the model's file name and where it sits, and what the
-  server reports (`/object_info`: loaders, text encoders, VAEs, samplers), it proposes a family
-  entry: how the model loads, its text encoder and VAE, steps, CFG, sampler and scheduler, CLIP
-  skip, quality and negative words, prompt style (tags or prose) and size range.
-- **A workflow the builder can't make.** For what `Comfy::Workflow` doesn't build (a new
-  architecture, ControlNet or pose-sheet graphs, the training graph in section 6), it proposes a
-  ComfyUI graph in API form, with the inputs baible fills in (prompt, seed, size, files) named.
-- **Checked against the server**, node by node, before anyone sees it: every node class exists,
-  every input is one that node takes with a value it accepts, every file is on the server. A
-  proposal that fails is sent back with what failed, a few times at most, then dropped with the
-  reason.
-- **A person accepts it**, seeing the outline and a test render. Accepted, it is saved as data
-  (a family in the database beside `config/comfy.yml`'s, or a stored workflow) and reused as is:
-  the language model is never asked per batch, so a recipe made with it stays reproducible, and
-  the recipe and sidecar record the graph as for any batch.
-- Without a language model, or when it can't help, everything works as now: the builder, the
+- **A family for an unknown model** (`FamilyWriter`). The page lists every model ComfyUI has and
+  how each runs (a config family, a learned one, or unknown: by folder). "Ask the language model"
+  on an unknown one gives it the file name and folder, the server's text encoders, CLIP types,
+  VAEs, samplers, schedulers and latent nodes, and two config families as examples; it answers
+  with a family as `config/comfy.yml` writes one (`LearnedFamily::KEYS`).
+- **A workflow the builder can't make** (`WorkflowWriter`), from a name and a description. First
+  it is shown every node class on the server and asked which it needs (30 at most); then it is
+  given those nodes' full definitions (choices cut to 20) and the builder's own graph for an
+  ordinary picture as an example, and writes a graph in API form. Where a batch's values go it
+  puts placeholders (`Comfy::Template`): `{{prompt}}`, `{{negative}}`, `{{prefix}}` (strings),
+  `{{seed}}`, `{{width}}`, `{{height}}` (integers), `{{model}}`, `{{source_image}}` (files). It
+  must save with `SaveImage` and `filename_prefix` `{{prefix}}`.
+- **Checked against the server** before anyone sees it: a family by `Comfy::FamilyCheck` (its
+  encoder, CLIP type, VAE, sampler and scheduler are on the server; steps, CFG, sizes and styles
+  in range), a graph by `Comfy::GraphCheck` (every node class exists, every input is one the node
+  takes, links point at real outputs of a compatible type, values are in the node's choices and
+  ranges, required inputs are there, placeholders sit where their kind of value goes). A
+  proposal that fails is sent back with the problems, three answers at most, then failed with the
+  reason; every exchange is kept in the item's `log`, shown on the page.
+- **A person tries it, then accepts it.** "Try it" makes a test render (`Trial`, `TrialJob`): a
+  family through the builder with its settings, a workflow filled with the default model and a
+  test prompt (a workflow that needs `{{source_image}}` can't be tried alone yet). Accept is
+  refused until the latest trial is done. A person may edit the settings or graph as JSON; an
+  edit is checked the same way and goes back to proposed, to be tried again.
+- **Accepted, it is data, reused as is.** An accepted family joins `config/comfy.yml`'s
+  (`Comfy::Family.configured`, the config winning a slug clash) and matches its model from then
+  on. A kind may make its pictures with an accepted workflow (the kind's page): its graph is
+  frozen into each batch's recipe (`recipe["learned_workflow"]`), filled per candidate, and
+  checked against the server's definitions of its nodes before anything is queued, so a node or
+  file the server no longer has stops the batch, saying so. Such a batch has no drafts and no
+  background removal, and starts from a picture only if the graph takes `{{source_image}}`. The
+  language model is never asked per batch, so a recipe made with it stays reproducible, and the
+  recipe and sidecar carry the graph as for any batch. Deleting a workflow sends its kinds back to
+  the builder; later edits don't touch recipes already frozen.
+- Without a language model, or when it can't help, everything works as before: the builder, the
   config's families, and the by-folder fallback. The builder stays the first choice wherever it
   can do the job; the fewest nodes still wins.
 
 Open: which local models are good enough at ComfyUI graphs to be worth it, tried on a few models
-the config doesn't know.
+the config doesn't know; and whether the training graph (section 6) should become a learned
+workflow on servers whose trainer nodes differ.
 
 ## 5. Batches, candidates, picks
 

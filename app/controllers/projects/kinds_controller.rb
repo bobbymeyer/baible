@@ -50,6 +50,7 @@ class Projects::KindsController < ApplicationController
   end
 
   def kind_params
-    params.expect(kind: [ :name, :medium, :prompt, :negative, :model, :width, :height, :transparent, :seconds, :variant_presets, { loras: {} } ])
+    params.expect(kind: [ :name, :medium, :prompt, :negative, :model, :width, :height, :transparent, :seconds, :variant_presets,
+                          :learned_workflow_id, { loras: {} } ])
   end
 end

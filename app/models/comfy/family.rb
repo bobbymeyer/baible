@@ -9,16 +9,32 @@ module Comfy
   class Family
     attr_reader :slug, :settings
 
+    # config/comfy.yml's families, then the learned ones (LearnedFamily):
+    # every one by name, so a proposed family can be tried.
     def self.configured
-      Comfy.config.fetch(:families, {}).to_h.deep_stringify_keys
+      config_families.merge(LearnedFamily.configs) { |_, from_config, _| from_config }
+    end
+
+    # The families a model's name may match: config's, then learned ones a
+    # person has accepted.
+    def self.matchable
+      config_families.merge(LearnedFamily.configs(accepted_only: true)) { |_, from_config, _| from_config }
+    end
+
+    def self.config_families = Comfy.config.fetch(:families, {}).to_h.deep_stringify_keys
+
+    # The family a model's name matches, or nil when none does (it would run
+    # by where its file is: an unknown model).
+    def self.match(model)
+      name = File.basename(model.to_s).downcase
+      matchable.find { |_, family| matches?(family["match"], name) }&.first
     end
 
     # The family for a model file. A name no family matches goes by where
     # the file is on ComfyUI, when that's known (capabilities, or a lambda
     # giving them, only called when the name alone doesn't settle it).
     def self.for(model, capabilities: nil)
-      name = File.basename(model.to_s).downcase
-      slug = configured.find { |_, family| matches?(family["match"], name) }&.first
+      slug = match(model)
       capabilities = capabilities.call if !slug && capabilities.respond_to?(:call)
       slug ||= Comfy.config[:checkpoint_family].to_s if capabilities.respond_to?(:checkpoint?) && capabilities.checkpoint?(model)
       slug ||= Comfy.config[:default_family].to_s
@@ -43,6 +59,9 @@ module Comfy
     end
 
     def label = settings["label"] || slug.humanize
+
+    # Learned rather than configured (LearnedFamily).
+    def learned? = !self.class.config_families.key?(slug)
     def steps = settings.fetch("steps", 25).to_i
 
     # How a LoRA is trained on it (config/comfy.yml `training`, with the

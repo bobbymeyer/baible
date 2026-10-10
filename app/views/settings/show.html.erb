@@ -1,5 +1,6 @@
 <% content_for :title, "Settings" %>
 <h1>Settings</h1>
+<p class="hint">Models ComfyUI has that baible doesn't know, and workflows its builder can't make: <%= link_to "Models and workflows", learning_path %>.</p>
 <p class="prose">
   Where baible finds ComfyUI (for images, audio and taking backgrounds off) and a language model (for writing prompts). Leave a field blank to use the server's
   environment (<code>COMFY_URL</code>, <code>LLM_URL</code> and so on). Only addresses and names go here: if ComfyUI or the model needs a

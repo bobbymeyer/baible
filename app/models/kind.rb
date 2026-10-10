@@ -14,6 +14,9 @@ class Kind < ApplicationRecord
   SECONDS = (10..240)
 
   belongs_to :project
+  # An accepted learned workflow it makes its pictures with, instead of the
+  # builder's graph (docs/HANDOFF.md "Unknown models and new workflows").
+  belongs_to :learned_workflow, optional: true
   has_many :subjects, dependent: :restrict_with_error
   has_many :standing_orders, dependent: :destroy
 
@@ -23,6 +26,7 @@ class Kind < ApplicationRecord
   validates :medium, inclusion: { in: MEDIA }
   validates :width, :height, numericality: { only_integer: true, in: SIZES }
   validates :seconds, numericality: { only_integer: true, in: SECONDS }
+  validate :learned_workflow_is_accepted, if: :learned_workflow_id_changed?
 
   # From config/comfy.yml `kinds`, as attributes.
   def self.starters
@@ -60,4 +64,10 @@ class Kind < ApplicationRecord
   end
 
   def label = "#{name} (#{medium})"
+
+  private
+
+  def learned_workflow_is_accepted
+    errors.add(:learned_workflow, "must be one a person has accepted") if learned_workflow && !learned_workflow.accepted?
+  end
 end
