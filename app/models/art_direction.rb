@@ -2,7 +2,8 @@
 
 # Helpers for composing a recipe in layers (docs/HANDOFF.md "The layered
 # recipe"): the project's house style, the kind's framing, the entry's look,
-# the subject's specifics, a variant's detail.
+# what a derived subject's parents say, the subject's specifics, a variant's
+# detail.
 module ArtDirection
   module_function
 
@@ -44,9 +45,9 @@ module ArtDirection
   end
 
   # The prompt from a recipe's parts, in layer order. (Recipes made before
-  # entries have no "entry" part.)
+  # entries have no "entry" part, and before derived kinds no "parent".)
   def compose(parts)
-    join_prompt(*parts.values_at("prefix", "style", "framing", "entry", "subject", "detail"))
+    join_prompt(*parts.values_at("prefix", "style", "framing", "entry", "parent", "subject", "detail"))
   end
 
   def join_prompt(*parts)

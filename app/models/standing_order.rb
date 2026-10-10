@@ -55,12 +55,13 @@ class StandingOrder < ApplicationRecord
     note
   end
 
-  # The targets it looks at: every subject in scope, and each variant.
+  # The targets it looks at: every subject in scope, and each variant. A
+  # sheet isn't made, only laid out, so it's never one.
   def targets
     subjects = project.subjects.includes(:kind, :variants, :picks, :batches)
     subjects = subjects.where(kind: kind) if kind
     subjects = subjects.where(entry: entry) if entry
-    subjects.sort_by { |subject| [ subject.kind.position, subject.name.downcase ] }
+    subjects.reject(&:sheet?).sort_by { |subject| [ subject.kind.position, subject.name.downcase ] }
             .flat_map { |subject| [ nil, *subject.variants ].map { |variant| [ subject, variant ] } }
   end
 

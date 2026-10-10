@@ -7,6 +7,14 @@
 # It may be one depiction of an entry (Cid's portrait, of Cid), whose look
 # comes before it in an image's recipe.
 #
+# It may derive from a subject of its kind's parent kind (docs/HANDOFF.md
+# "Derived kinds and sheets"): Cid's portrait from Cid, the character.
+# The parents' layers then come before its own (their words, models and
+# LoRAs), it depicts the same entry, and its batches start from the
+# parent's picture when its kind says so. Its own words are its notes: its
+# name is a label, as the parent already names it. A sheet's subject lays
+# out the picks of what derives from its parent (Sheet).
+#
 # A batch makes candidates for the subject itself or for one of its
 # variants (the target), and the one picked is kept, with how it was made,
 # as one of that target's Picks.
@@ -14,6 +22,8 @@ class Subject < ApplicationRecord
   belongs_to :project
   belongs_to :kind
   belongs_to :entry, optional: true
+  belongs_to :parent, class_name: "Subject", optional: true
+  has_many :derived_subjects, class_name: "Subject", foreign_key: :parent_id, dependent: :nullify, inverse_of: :parent
   has_many :variants, -> { order(:position, :id) }, dependent: :destroy, inverse_of: :subject
   has_many :batches, dependent: :destroy
   has_many :picks, dependent: :destroy
@@ -22,11 +32,33 @@ class Subject < ApplicationRecord
 
   validates :name, presence: true, uniqueness: { scope: :kind_id }
   validates :seconds, numericality: { only_integer: true, in: Kind::SECONDS }, allow_nil: true
-  validate :kind_in_project, :entry_in_project
+  validate :kind_in_project, :entry_in_project, :parent_fits
 
+  before_validation { self.entry ||= parent.entry if parent }
   after_create :add_preset_variants
 
-  delegate :image?, :audio?, :medium, to: :kind
+  delegate :image?, :audio?, :sheet?, :medium, to: :kind
+
+  # The subjects it derives from, nearest first.
+  def ancestors
+    chain = []
+    subject = parent
+    while subject && chain.exclude?(subject) && subject != self
+      chain << subject
+      subject = subject.parent
+    end
+    chain
+  end
+
+  # The kinds a subject can derive from it in (Cid's: Portrait, Turnaround,
+  # his design sheet), in the project's order.
+  def derivable_kinds = project.kinds.select { |other| other.parent_kinds.include?(kind) }
+
+  # What derives from it, at any depth, kind by kind in the project's order.
+  def descendants
+    derived_subjects.includes(:kind).sort_by { |subject| [ subject.kind.position, subject.kind.id, subject.name.downcase ] }
+                    .flat_map { |subject| [ subject, *subject.descendants ] }
+  end
 
   def loras=(value)
     super(ArtDirection.loras(value))
@@ -59,8 +91,11 @@ class Subject < ApplicationRecord
   # What the subject layer says: its name and notes for an image; its notes
   # (a description, as tags) for audio, where a name would only be noise.
   def subject_prompt
-    audio? ? notes.to_s : ArtDirection.join_prompt(name, notes)
+    audio? || parent ? notes.to_s : ArtDirection.join_prompt(name, notes)
   end
+
+  # What its parents say, root first: Cid's words before his costume's.
+  def parent_prompt = ArtDirection.join_prompt(*ancestors.reverse.map(&:subject_prompt))
 
   # The model from the lowest layer that names one. Audio doesn't use the
   # project's (an image model): ACE-Step's checkpoint is its default.
@@ -68,7 +103,7 @@ class Subject < ApplicationRecord
     if audio?
       ArtDirection.pick_model(model, kind.model, Comfy::Music.default_model)
     else
-      ArtDirection.pick_model(model, kind.model, project.model, Comfy.config[:model])
+      ArtDirection.pick_model(model, kind.model, *ancestors.map(&:model), project.model, Comfy.config[:model])
     end
   end
 
@@ -85,7 +120,26 @@ class Subject < ApplicationRecord
     entry && !audio? ? [ entry.trained_lora(family), *entry.loras ].compact : []
   end
 
+  # The LoRAs its parents name, root first (a character's own LoRA).
+  def parent_loras = ArtDirection.stack_loras(*ancestors.reverse.map(&:loras))
+
   def image_family = Comfy::Family.for(model_file, capabilities: -> { Comfy.capabilities })
+
+  # Where a batch for it starts when nobody chose (docs/HANDOFF.md "Derived
+  # kinds and sheets"), as Batch.start!'s source with its denoise: a
+  # variant redraws the subject's own picture, once it has one; the
+  # subject redraws its parent's (or its head), as its kind says. nil:
+  # from words alone.
+  def derived_source(variant = nil)
+    start = kind.derived_start or return
+    own = pick_for(nil) if variant
+    if own&.image?
+      return { "pick_id" => own.id, "crop" => nil, "denoise" => Comfy.config.fetch(:chain, {}).fetch(:denoise, 0.45) }
+    end
+
+    from = parent&.pick_for(nil)
+    start.merge("pick_id" => from.id) if from&.image?
+  end
 
   # The layers as shown in the studio, top to bottom.
   def layers(variant = nil)
@@ -97,6 +151,9 @@ class Subject < ApplicationRecord
     if entry && image?
       family = image_family
       rows << { "label" => entry.name, "role" => "Entry", "prompt" => entry_prompt(family), "model" => nil, "loras" => entry_loras(family) }
+    end
+    ancestors.reverse_each do |above|
+      rows << { "label" => above.name, "role" => above.kind.name, "prompt" => above.subject_prompt, "model" => above.model, "loras" => above.loras }
     end
     rows << { "label" => name, "role" => "Subject", "prompt" => subject_prompt, "model" => model, "loras" => audio? ? [] : loras }
     rows << { "label" => variant.name, "role" => "Variant", "prompt" => variant.prompt, "loras" => [] } if variant
@@ -110,7 +167,14 @@ class Subject < ApplicationRecord
   # kept so the subject can be rewritten (PromptWriter) and the prompt put
   # back together.
   def recipe(variant = nil)
+    return sheet_recipe if sheet?
+
     audio? ? audio_recipe(variant) : image_recipe(variant)
+  end
+
+  # A sheet's: what it lays out, frozen like any recipe (Sheet.plan).
+  def sheet_recipe
+    { "medium" => "sheet", "sheet" => Sheet.plan(self) }
   end
 
   def image_recipe(variant = nil)
@@ -118,12 +182,13 @@ class Subject < ApplicationRecord
     family = Comfy::Family.for(model, capabilities: -> { Comfy.capabilities })
     parts = { "prefix" => family.prefix, "style" => project.style.to_s, "framing" => kind.prompt.to_s,
               "entry" => entry_prompt(family), "subject" => subject_prompt, "detail" => variant&.prompt.to_s }
+    parts["parent"] = parent_prompt if parent
     width, height = family.size(kind.width, kind.height)
     {
       "medium" => "image",
       "model" => model,
       "family" => family.slug,
-      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras(family), loras),
+      "loras" => ArtDirection.stack_loras(project.loras, kind.loras, entry_loras(family), parent_loras, loras),
       "positive" => ArtDirection.compose(parts),
       "negative" => family.negative? ? ArtDirection.join_prompt(family.negative_prefix, project.negative, kind.negative) : "",
       "width" => width,
@@ -179,6 +244,18 @@ class Subject < ApplicationRecord
 
   def entry_in_project
     errors.add(:entry, "must be one of the project's") if entry && project && entry.project_id != project_id
+  end
+
+  # From a subject of its kind's parent kind (or of a kind derived from
+  # that), never from itself or what derives from it.
+  def parent_fits
+    return unless parent && kind
+
+    if parent == self || parent.ancestors.include?(self)
+      errors.add(:parent, "can't be itself or derive from it")
+    elsif parent.project_id != project_id || kind.parent_kinds.exclude?(parent.kind)
+      errors.add(:parent, kind.parent ? "must be a #{kind.parent.name} (or derived from one)" : "needs a kind derived from another")
+    end
   end
 
   def add_preset_variants

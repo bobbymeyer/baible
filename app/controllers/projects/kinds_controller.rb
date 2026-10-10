@@ -1,14 +1,15 @@
 # frozen_string_literal: true
 
 # A project's kinds (its "art direction"): the framing, size, model and
-# LoRAs for each kind of asset, the middle layer of every recipe.
+# LoRAs for each kind of asset, the middle layer of every recipe; which
+# kind each derives from; and sheets, which lay out what others made.
 class Projects::KindsController < ApplicationController
   include ProjectScoped
 
   before_action :set_kind, only: %i[edit update destroy]
 
   def index
-    @kinds = @project.kinds.includes(:subjects)
+    @kinds = @project.kinds.includes(:subjects, :parent, :derived_kinds)
   end
 
   def new
@@ -51,6 +52,6 @@ class Projects::KindsController < ApplicationController
 
   def kind_params
     params.expect(kind: [ :name, :medium, :prompt, :negative, :model, :width, :height, :transparent, :seconds, :variant_presets,
-                          :learned_workflow_id, { loras: {} } ])
+                          :learned_workflow_id, :parent_id, :derive, :derive_denoise, { loras: {} }, { sheet_kind_ids: [] } ])
   end
 end

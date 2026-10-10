@@ -4,7 +4,8 @@
 # (config/llm.yml), in the way the image model reads best: booru tags for
 # the anime families, plain sentences for the rest (Comfy::Family
 # #prompt_style). Only the subject is rewritten: the house style, the
-# framing, the entry's look (the same words in every picture of it) and the
+# framing, the entry's look (the same words in every picture of it), what
+# a derived subject's parent says, and the
 # family's quality words stay as the author wrote them, and
 # the model is told about them so it doesn't repeat or contradict them.
 #
@@ -36,7 +37,7 @@ module PromptWriter
     TEXT
     user = <<~TEXT
       The subject to draw: #{subject}
-      Already in the prompt, don't repeat or contradict: #{[ parts['style'], parts['framing'], parts['entry'], parts['detail'] ].map(&:to_s).reject(&:blank?).join(' | ').presence || 'nothing'}
+      Already in the prompt, don't repeat or contradict: #{[ parts['style'], parts['framing'], parts['entry'], parts['parent'], parts['detail'] ].map(&:to_s).reject(&:blank?).join(' | ').presence || 'nothing'}
     TEXT
     key = [ "prompt_writer", style, Digest::SHA256.hexdigest([ system, user, Llm.config[:model] ].join("\n")) ].join("/")
     Rails.cache.fetch(key, expires_in: 30.days) { tidy(client.chat(system: system, user: user)) }

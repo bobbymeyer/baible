@@ -13,6 +13,14 @@
         <%= f.select :kind_id, @project.kinds.map { |kind| [ kind.label, kind.id ] } %>
       </div>
     </div>
+    <% parents = parent_choices(@project) %>
+    <% if parents.any? %>
+      <div class="field">
+        <%= f.label :parent_id, "Derived from" %>
+        <%= f.select :parent_id, grouped_options_for_select(parents, @subject.parent_id), include_blank: "Nothing: it stands alone" %>
+        <p class="hint">For a kind that derives from another (a Portrait from a Character): the subject it's of, whose words, LoRAs and entry it takes, and whose picture it can redraw.</p>
+      </div>
+    <% end %>
     <div class="field">
       <%= f.label :entry_id, "Entry" %>
       <%= f.select :entry_id, @project.entries.map { |entry| [ entry.name, entry.id ] }, include_blank: "None" %>

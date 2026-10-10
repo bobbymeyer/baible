@@ -4,8 +4,9 @@
 # batch first saves the subject's own layer as written in the studio (its
 # notes, model and LoRAs; lyrics and length for audio), then queues the
 # candidates with ComfyUI for the subject, one variant, or every variant at
-# once. The studio's strips fill in as they land. Or queue it for the night
-# window instead (tonight: one target, or "every" variant; NightShift).
+# once (a sheet: laid out at once, Sheet). The studio's strips fill in as
+# they land. Or queue it for the night window instead (tonight: one target,
+# or "every" variant; NightShift).
 class Subjects::BatchesController < ApplicationController
   include SubjectScoped
 
@@ -14,9 +15,9 @@ class Subjects::BatchesController < ApplicationController
     tonight = params[:tonight].present?
     options = { count: params[:count].presence || Comfy.config[:candidates], write: params[:write] != "0",
                 transparent: { "1" => true, "0" => false }[params[:transparent]], draft: params[:draft] == "1", tonight: tonight }
-    if (source = chain_source)
-      options.merge!(source: source, denoise: denoise_for(source), draft: false)
-    end
+    source = chain_source
+    options[:source] = source
+    options[:denoise] = denoise_for(source) if source.is_a?(Hash) || (source == :derived && params[:denoise].present?)
 
     if params[:every] == "1" || params[:tonight] == "every"
       raise Refusal, "#{@subject.name} has no variants yet" if @subject.variants.empty?
@@ -51,9 +52,12 @@ class Subjects::BatchesController < ApplicationController
   end
 
   # A pick of this project's to redraw from (images only), with its head
-  # cut out of it when asked (Headshot).
+  # cut out of it when asked (Headshot); "derived": as the subject's kind
+  # says, from its parent's picture (Subject#derived_source); blank: words
+  # alone.
   def chain_source
-    return if params[:from_pick_id].blank? || @subject.audio?
+    return if params[:from_pick_id].blank? || !@subject.image?
+    return :derived if params[:from_pick_id] == "derived"
 
     pick = @project.picks.find(params[:from_pick_id])
     raise Refusal, "#{pick.title} has no image to draw from" unless pick.image?
@@ -64,6 +68,7 @@ class Subjects::BatchesController < ApplicationController
   # As asked, or config/comfy.yml's `chain` for cutting a head or not.
   def denoise_for(source)
     return params[:denoise].to_f if params[:denoise].present?
+    return if source == :derived
 
     chain = Comfy.config.fetch(:chain, {})
     source["crop"] == "head" ? chain.fetch(:head_denoise, 0.55) : chain.fetch(:denoise, 0.45)

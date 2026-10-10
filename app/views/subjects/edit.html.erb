@@ -11,11 +11,19 @@
       <p class="hint">Another <%= @subject.medium %> kind; its picks stay.</p>
     </div>
   </div>
+  <div class="field">
+    <%= f.label :entry_id, "Entry" %>
+    <%= f.select :entry_id, @project.entries.map { |entry| [ entry.name, entry.id ] }, include_blank: "None" %>
+    <p class="hint">What it depicts, from the <%= link_to "bible", project_entries_path(@project) %>: its look comes before this subject's notes in every image.</p>
+  </div>
+  <% parents = parent_choices(@project, except: @subject) %>
+  <% if parents.any? %>
     <div class="field">
-      <%= f.label :entry_id, "Entry" %>
-      <%= f.select :entry_id, @project.entries.map { |entry| [ entry.name, entry.id ] }, include_blank: "None" %>
-      <p class="hint">What it depicts, from the <%= link_to "bible", project_entries_path(@project) %>: its look comes before this subject's notes in every image.</p>
+      <%= f.label :parent_id, "Derived from" %>
+      <%= f.select :parent_id, grouped_options_for_select(parents, @subject.parent_id), include_blank: "Nothing: it stands alone" %>
+      <p class="hint">A subject of the kind its kind derives from (or of one derived from that).</p>
     </div>
+  <% end %>
   <p class="hint">Notes, model and LoRAs are edited in the studio, where they're generated with.</p>
   <div class="actions">
     <%= f.submit "Save", class: "button button--primary" %>
@@ -24,7 +32,7 @@
 <% end %>
 <section class="window">
   <h2>Delete <%= @subject.name %></h2>
-  <p class="hint">Its variants, batches and picks go with it.</p>
+  <p class="hint">Its variants, batches and picks go with it.<%= " What derives from it stays, standing alone." if @subject.derived_subjects.any? %></p>
   <%= button_to "Delete #{@subject.name}", subject_path(@subject), method: :delete, class: "button button--danger",
                 form: { data: { turbo_confirm: "Delete #{@subject.name} and its picks?" } } %>
 </section>

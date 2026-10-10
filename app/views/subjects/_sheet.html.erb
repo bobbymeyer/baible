@@ -1,0 +1,33 @@
+<%# A sheet's studio: what it lays out now (Sheet.plan), and laying it out. The candidate lands in the strip below, to
+    be picked like any other. subject: a sheet's subject. %>
+<% plan = Sheet.plan(subject) %>
+<% if subject.parent.nil? %>
+  <p class="empty">
+    A sheet lays out what derives from one subject: <%= link_to "choose which", edit_subject_path(subject) %>
+    (a <%= subject.kind.parent&.name || "subject" %>).
+  </p>
+<% elsif plan["rows"].empty? %>
+  <p class="empty">Nothing of <%= subject.parent.name %>'s is picked yet, in <%= subject.kind.sheet_kinds.map(&:name).to_sentence(two_words_connector: " or ", last_word_connector: " or ") %>.</p>
+<% else %>
+  <p class="hint">
+    What stands for each target (its canon pick, else its current one), a row for each subject, in
+    <%= link_to subject.kind.name, edit_project_kind_path(subject.project, subject.kind) %>'s kinds. Laid out here, not in ComfyUI.
+  </p>
+  <ol class="sheet-plan">
+    <% plan["rows"].each do |row| %>
+      <li>
+        <strong><%= row["label"] %></strong>
+        <ul class="sheet-plan__cells">
+          <% row["cells"].each do |cell| %>
+            <% pick = Pick.find_by(id: cell["pick_id"]) %>
+            <li>
+              <% if pick&.image? %><%= image_tag url_for(pick.file), alt: cell["label"], class: "thumb", loading: "lazy" %><% end %>
+              <small><%= cell["label"] %></small>
+            </li>
+          <% end %>
+        </ul>
+      </li>
+    <% end %>
+  </ol>
+  <%= button_to "Lay out the sheet", subject_batches_path(subject), class: "button" %>
+<% end %>

@@ -34,15 +34,27 @@ class Batch < ApplicationRecord
   # tonight: queue it for the night window instead (NightShift): it waits as
   # "scheduled", is made at full quality (no drafts: nobody is there to
   # choose one), and replaces nothing, as nothing replaces it but a pick.
-  def self.start!(subject, variant: nil, count: Comfy.config[:candidates], write: true, transparent: nil, draft: false, source: nil,
-                  denoise: nil, tonight: false)
+  # A derived subject starts from its parent's picture when its kind says
+  # so (source: :derived, the default; Subject#derived_source); nil starts
+  # from words alone. A sheet is laid out at once, from the picks as they
+  # are (Sheet): one candidate, no ComfyUI.
+  def self.start!(subject, variant: nil, count: Comfy.config[:candidates], write: true, transparent: nil, draft: false,
+                  source: :derived, denoise: nil, tonight: false)
+    return start_sheet!(subject) if subject.sheet?
+
     draft = false if tonight
     raise ArgumentError, "That variant is another subject's" if variant && variant.subject_id != subject.id
+
+    if source == :derived
+      source = subject.derived_source(variant)&.dup
+      denoise ||= source&.delete("denoise")
+    end
 
     count = count.to_i.clamp(1, 8)
     base = Random.rand(2**31)
     seeds = Array.new(count) { |i| (base + i) % 2**31 }
     from = source && Pick.find(source["pick_id"])
+    draft = false if from # a redrawing is made properly at once
     hint = from ? from.seed : subject.seed_hint(variant)
     seeds[0] = hint if hint
     batch = transaction do
@@ -74,6 +86,32 @@ class Batch < ApplicationRecord
     end
     BatchJob.perform_later(batch) unless tonight
     batch
+  end
+
+  def self.start_sheet!(subject)
+    recipe = subject.recipe
+    raise Refusal, "Nothing to lay out yet: #{subject.name}'s sheet needs a parent with picks" if recipe.dig("sheet", "rows").blank?
+
+    batch = transaction do
+      subject.batches.where(night: false).destroy_all
+      create!(subject: subject, recipe: recipe).tap { |b| b.candidates.create!(position: 0, seed: 0) }
+    end
+    BatchJob.perform_later(batch)
+    batch
+  end
+
+  def sheet? = recipe["medium"] == "sheet"
+
+  # Lay the sheet out (Sheet.compose): its one candidate, done.
+  def compose_sheet!
+    bytes = Sheet.compose(recipe["sheet"])
+    image = Vips::Image.new_from_buffer(bytes, "")
+    candidate = candidates.first
+    candidate.file.attach(io: StringIO.new(bytes), filename: "#{subject.file_stem(nil, 'sheet')}.png", content_type: "image/png")
+    candidate.update!(status: "done")
+    update!(recipe: recipe.merge("width" => image.width, "height" => image.height), status: "done", error: nil)
+  rescue Sheet::Missing => e
+    fail!(e.message)
   end
 
   # The night shift lets it go: into ComfyUI, as if just started.

@@ -107,6 +107,14 @@ batch. HANDOFF "Unknown models and new workflows" has the details.
    The **Model sheet** kind makes a character's reference views (front, both three-quarters, full
    body front, side and back), each its own picture.
 4. **Add a subject** to a kind: the goblin, Cid, the harbour town, the harbour's theme.
+   **Derived kinds:** a kind can derive from another. The usual kinds put a **Character** on top,
+   with Character sprite, Portrait, Model sheet and Costume derived from it. In Cid's studio,
+   "Derived from Cid" makes his portrait, sprite, turnaround or a costume in a click. Each takes his
+   words, LoRAs and entry, and starts from his picture (or its head) as its kind says. A costume
+   ("Cid, winter coat") can have its own portrait and sprite.
+   **Sheets:** a kind of medium Sheet (the **Character design sheet**) makes nothing in ComfyUI.
+   "Lay out the sheet" puts the picks of Cid and everything derived from him into one picture, with
+   a row for each, to pick, approve and download like any other.
 5. **In its studio**, see the layers, write its notes (and model and LoRAs, or lyrics and length),
    and **Generate** for the subject, one variant, or every variant. Drafts first by default for
    images: "Make this one properly" renders the one you like at full quality from the draft.

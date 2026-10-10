@@ -20,7 +20,7 @@
 <% @kinds.each do |kind| %>
   <section class="window" id="<%= dom_id(kind) %>">
     <div class="page-header page-header--tight">
-      <h2><span class="medium medium--<%= kind.medium %>" title="<%= kind.medium.humanize %>"></span><%= kind.name %></h2>
+      <h2><span class="medium medium--<%= kind.medium %>" title="<%= kind.medium.humanize %>"></span><%= kind.name %><%= tag.small(" from #{kind.parent.name}", class: "muted") if kind.parent %></h2>
       <%= link_to "Add one", new_project_subject_path(@project, kind_id: kind.id), class: "button button--quiet" %>
     </div>
     <% if kind.subjects.empty? %>
@@ -37,7 +37,7 @@
                 <span class="plate <%= 'plate--audio' if kind.audio? %>" aria-hidden="true"><%= subject.name.first unless kind.audio? %></span>
               <% end %>
               <strong><%= subject.name %></strong>
-              <small><%= "#{subject.entry.name} · " if subject.entry && subject.entry.name != subject.name %><%= pluralize(subject.picked_targets, "pick") %><%= " of #{subject.variants.size + 1}" if subject.variants.any? %></small>
+              <small><%= "from #{subject.parent.name} · " if subject.parent && subject.parent.name != subject.name %><%= "#{subject.entry.name} · " if subject.entry && subject.entry.name != subject.name && !subject.parent %><%= pluralize(subject.picked_targets, "pick") %><%= " of #{subject.variants.size + 1}" if subject.variants.any? %></small>
             <% end %>
           </li>
         <% end %>

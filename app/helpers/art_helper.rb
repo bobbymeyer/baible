@@ -58,9 +58,18 @@ module ArtHelper
   # The project's standing image picks to start a batch from, grouped by subject,
   # for a select: [[subject, [[label, id], ...]], ...].
   def chain_choices(project)
-    picks = Pick.standing(project.picks.images.includes(:variant, :subject)).sort_by { |pick| [ pick.subject.name.downcase, pick.variant&.position.to_i, pick.variant_id.to_i ] }
+    picks = Pick.standing(project.picks.images.includes(:variant, subject: :kind)).reject { |pick| pick.subject.sheet? }.sort_by { |pick| [ pick.subject.name.downcase, pick.variant&.position.to_i, pick.variant_id.to_i ] }
     picks.group_by(&:subject).map do |subject, rows|
       [ "#{subject.name} (#{subject.kind.name})", rows.map { |pick| [ "#{pick.variant ? pick.variant.name : 'itself'} · seed #{pick.seed}", pick.id ] } ]
+    end
+  end
+
+  # The subjects another can derive from, grouped by kind, for a select: every
+  # image subject but the one itself (Subject#parent_fits says which fit).
+  def parent_choices(project, except: nil)
+    project.kinds.select(&:image?).filter_map do |kind|
+      subjects = kind.subjects.reject { |subject| subject == except }.sort_by { |subject| subject.name.downcase }
+      [ kind.name, subjects.map { |subject| [ subject.name, subject.id ] } ] if subjects.any?
     end
   end
 end

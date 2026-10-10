@@ -48,11 +48,12 @@ language model; their open questions are listed where they are described.
 ## 2. Data model
 
 ```
-Project ─┬─ Kind ──────────┐            (a kind belongs to a project)
+Project ─┬─ Kind ──────────┐            (a kind belongs to a project, and may derive from another)
          ├─ Entry ─────────┤            (an entry belongs to a project; the bible)
          │    ├─ Note                   (a signed note on an entry)
          │    └─ Training               (one LoRA training run, from the entry's picks)
-         └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry)
+         └─ Subject ───────┴─ Variant   (a subject belongs to a project, one of its kinds and maybe an entry;
+                                         it may derive from another subject: Cid's portrait from Cid)
                 Subject / Variant ─── Batch ─── Candidate        (rounds of generation)
                 Subject / Variant ─── Pick (a history per target: one current, at most one canon)
 LearnedFamily / LearnedWorkflow ─── Trial   (Kind ─ LearnedWorkflow, optional)
@@ -62,14 +63,14 @@ SiteSetting (one row)   User ─ Session
 | Model | What | Columns that matter |
 | --- | --- | --- |
 | `Project` | A world or setting; the top layer | `name` (unique), `description` (never in a prompt), `style`, `negative`, `model`, `loras`, `sound` |
-| `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets`, `learned_workflow` (an accepted one, or none for the builder's graph) |
+| `Kind` | A kind of asset in a project, named freely ("Creature", "Portrait", "Map", "Theme music"); the middle layer | `medium` (`image` \| `audio` \| `sheet`), `prompt` (the framing), `negative`, `width`, `height`, `transparent`, `model`, `loras`, `seconds`, `variant_presets`, `learned_workflow` (an accepted one, or none for the builder's graph), `parent` (the kind it derives from), `derive` (`words`, `picture`, `head`), `derive_denoise`, `sheet_kind_ids` (section 5) |
 | `Entry` | One thing in the world across kinds (Cid; the harbour town); the entry layer, between kind and subject | `name` (unique in its project), `look`, `loras`, `lore` (never in a prompt), `trigger` (for its next LoRA), `training` (the run whose LoRA it uses) |
 | `StandingOrder` | Work the night shift plans for itself every night (section 7) | `project`, `kind`, `entry` (both optional), `user`, `action` (`fill_gaps`, `until_canon`, `train`), `count`, `nightly_limit`, `min_pictures`, `model`, `enabled`, `planned_at`, `report` |
 | `LearnedFamily` | A family the language model proposed for a model `config/comfy.yml` doesn't know (section 4) | `slug` (unique, `learned-…`), `label`, `model`, `match`, `settings` (as a config family), `status` (`asking`, `proposed`, `accepted`, `failed`), `error`, `log`, `user`, `accepted_by`, `accepted_at` |
 | `LearnedWorkflow` | A ComfyUI graph the language model wrote from a description, with placeholders (section 4) | `name` (unique), `purpose`, `graph`, `outline`, and the same status columns |
 | `Trial` | A test render of a learned family or workflow | `learnable` (either), `status` (as a batch), `error`, `prompt`, `seed`, `comfy_prompt_id`, `submitted_at`, `run_seconds`, attached `image` |
 | `Note` | A note on an entry: a question, a decision, a note to whoever draws it next. Never in a prompt | `entry`, `user` (null once their account goes), `body` |
-| `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
+| `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `parent` (the subject it derives from, optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
 | `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
 | `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants; or one queued for the night (section 7) | `recipe` (frozen at start), `status` (`scheduled` for tonight, then `queued` …), `error`, `night`, `released_at`, `submitted_at` |
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
@@ -88,7 +89,7 @@ SiteSetting (one row)   User ─ Session
 
 ## 3. The layered recipe
 
-Everything ComfyUI needs apart from the seed is composed from up to five layers, top to bottom
+Everything ComfyUI needs apart from the seed is composed from up to six layers, top to bottom
 (`Subject#recipe`, `Subject#layers`):
 
 | Layer | Image | Audio |
@@ -96,6 +97,7 @@ Everything ComfyUI needs apart from the seed is composed from up to five layers,
 | Project | `style`, `negative`, `model`, `loras` | `sound` |
 | Kind | `prompt` (framing), `negative`, size, `transparent`, `model`, `loras` | `prompt` (tags), `seconds`, `model` |
 | Entry, when the subject has one | its LoRA's trigger, `look`; its trained LoRA, `loras` | nothing |
+| Parents, when the subject derives from others (section 5), root first | each one's name and `notes`, `model`, `loras` | not derived |
 | Subject | its name and `notes`, `model`, `loras` | `notes` (as tags), `lyrics`, `seconds`, `model` |
 | Variant | `prompt` | `prompt` |
 
@@ -109,11 +111,16 @@ Everything ComfyUI needs apart from the seed is composed from up to five layers,
   entry only to sit on its page. Recipes from before entries have no `entry` part.
 - **Negative** (image): the family's negative words, the project's, the kind's; empty when the
   family doesn't use one (CFG 1).
+- **Parents** (a derived subject's, section 5) come after the entry, as written, never rewritten:
+  Cid's words before his costume's, his costume's before the portrait's. A derived subject's own
+  layer is its `notes` alone: its name is a label, its parent already names it. Recipes from
+  before derived kinds, and subjects that derive from nothing, have no `parent` part.
 - **Model:** the lowest layer that names one wins, then the default (`SiteSetting`, then
-  `config/comfy.yml`). Audio skips the project (its model is an image model): subject, kind, then
+  `config/comfy.yml`). A derived subject's kind comes before its parents (a sprite kind's pixel-art model beats the
+  character's), and they before the project. Audio skips the project (its model is an image model): subject, kind, then
   ACE-Step's checkpoint (`music.model`).
 - **LoRAs** (image) stack in layer order, project first (an entry's come after the kind's: a LoRA
-  trained on that character, say). A lower layer naming the same LoRA changes
+  trained on that character, say; then the parents'). A lower layer naming the same LoRA changes
   its strength in place, or switches it off. Switched-off LoRAs stay in the recipe, for the record.
 - **Size** (image) is the kind's, scaled into the family's trained range, keeping its shape.
 - **Length** (audio) is the subject's `seconds`, or the kind's.
@@ -126,7 +133,8 @@ Everything ComfyUI needs apart from the seed is composed from up to five layers,
 An image recipe: `medium, model, family, loras, positive, negative, width, height, transparent,
 parts` and, as a batch adds them, `write, cutout, ground, source, denoise, draft, steps, full,
 refines, source_image, workflow, writer_error`. An audio recipe: `medium, model, positive, lyrics,
-seconds, parts, workflow`.
+seconds, parts, workflow`. A sheet's: `medium` (`sheet`), `sheet` (`title`, `rows`: `label`,
+`subject_id`, `cells`: `pick_id`, `label`), and `width, height` once laid out.
 
 ## 4. Workflows, built per server
 
@@ -257,7 +265,47 @@ one picture per target.
   full-size picture rather than one crowded sheet. The face gets the room (front, both
   three-quarter views, which carry what's on one side only), with a few full-body views (front,
   side, back) for build and clothes. Expressions stay with Portrait. Laying the views out as one
-  sheet is the entry page's job, not ComfyUI's.
+  sheet is a sheet kind's job (below), not ComfyUI's.
+
+### Derived kinds and sheets
+
+A character is made once and everything else of it is derived from it: its portraits and their
+expressions, its turnaround, its battle sprite, its costumes. baible knows none of those words: it
+knows kinds that derive from kinds, subjects that derive from subjects, and sheets.
+
+- **A kind may derive from another** of the project's (`Kind#parent`; a tree, never a loop, and
+  only from an image kind). The starter kinds put a **Character** at the top, with Character
+  sprite, Portrait, Model sheet and **Costume** derived from it, and a **Character design sheet**.
+  Any project can rearrange that on its Kinds page; the rest of the starters stand alone.
+- **A subject of a derived kind may derive from a subject** of the kind it derives from, or of a
+  kind derived from that (`Subject#parent`, `Kind#parent_kinds`): Cid's portrait from Cid; the
+  portrait of Cid's winter coat from that costume, itself from Cid. Never from itself, what derives
+  from it, or a sheet. It depicts its parent's entry unless it says otherwise. Its parents' layers
+  come before its own (section 3). A subject of a derived kind can still stand alone (an
+  unnamed guard's portrait).
+- **Where its batches start** is the kind's `derive`: `words` (its layers alone: a back view
+  can't be redrawn from a front one), `picture` (redraw the parent's picture), or `head` (the head
+  cut from it, `Headshot`), re-noised by `derive_denoise` or `chain` in config/comfy.yml.
+  A variant redraws its own subject's picture instead, once it has one: an expression from the
+  neutral portrait. This is the default (`Batch.start!` with `source: :derived`; the studio
+  preselects it, and it can be changed or turned off per batch), so standing orders and the night
+  shift follow it too. Until the parent has a picture, it starts from words. A batch that starts
+  from a picture has no drafts.
+- **In the studio**, a subject's "Derived from" section lists every kind that can derive from it,
+  with what already does; "Make one" (`Subjects::DerivationsController`) adds one named as the
+  parent, "Make one of every kind" fills in the rest, and a costume or a second version is added
+  with a name of its own from New subject.
+- **A sheet** is a kind of medium `sheet`, of a parent kind (required): it makes nothing in
+  ComfyUI. Each of its subjects is of one subject (Cid), and "Lay out the sheet" puts what stands
+  for each target (canon, else current) of that subject and everything derived from it, of the
+  kinds in `sheet_kind_ids` (all, when none are chosen), into one picture (`Sheet`, libvips): a
+  title, a row for each subject (labelled with its kind, and its name when that differs), each
+  picture 512 pixels high with its label (the kind, or the variant), wrapping at six. The plan
+  (`recipe["sheet"]`: the pick ids and labels) is frozen when the batch starts; it is laid out by
+  `BatchJob` at once, without ComfyUI, as one candidate, and picked like any other: it has a
+  history, canon and a sidecar (`medium: "sheet"`, with the plan in its recipe). A picture gone
+  since the plan fails the batch, saying which. A sheet is never a training picture, a chain's
+  start, nor a standing order's target. Where libvips has no fonts, it is laid out unlabelled.
 
 ### Variants and chains
 
@@ -475,7 +523,7 @@ Every key is always present; what doesn't apply is `null`. `Pick#sidecar`.
 | `content_type` | string | `image/png`, `audio/mpeg`, `audio/flac` |
 | `byte_size` | integer | |
 | `sha256` | string | Hex digest of the file, to match sidecar to file |
-| `medium` | string | `image` or `audio` |
+| `medium` | string | `image`, `audio`, or `sheet` (several picks laid out as one image; the recipe lists them) |
 | `project`, `kind`, `subject` | string | Names, where it sits in baible |
 | `entry` | string \| null | The entry the subject depicts, or null |
 | `variant` | string \| null | The variant's name, or null for the subject itself |

@@ -20,7 +20,7 @@
           <strong><%= variant ? variant.name : subject.name %></strong>
           <% if pick %>
             <span class="pick__state"><%= pick.canon? ? "Canon" : "Current" %></span>
-            Seed <%= pick.seed %><%= tag.span(" · #{run_time(pick.run_seconds)}", class: "muted") if pick.run_seconds %>
+            <% unless subject.sheet? %>Seed <%= pick.seed %><%= tag.span(" · #{run_time(pick.run_seconds)}", class: "muted") if pick.run_seconds %><% end %>
             <% if pick.canon? %>
               <span class="muted">Approved by <%= pick.canon_by&.email_address || "someone no longer here" %></span>
             <% end %>
@@ -53,7 +53,7 @@
                 <p class="history__meta">
                   <% if old.canon? %><span class="pick__state">Canon</span><% end %>
                   <% if old.current? %><span class="pick__state">Current</span><% end %>
-                  Seed <%= old.seed %>
+                  <%= "Seed #{old.seed}" unless subject.sheet? %>
                   <span class="muted"><%= old.user&.email_address || "someone" %>, <time datetime="<%= old.created_at.utc.iso8601 %>"><%= time_ago_in_words(old.created_at) %> ago</time></span>
                 </p>
                 <%= render "subjects/pick_actions", pick: old, history: true %>

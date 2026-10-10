@@ -4,6 +4,7 @@
 <div class="crumbs">
   <%= link_to "Projects", projects_path %> / <%= link_to @project.name, project_path(@project) %> /
   <%= link_to @subject.kind.name, project_path(@project, anchor: dom_id(@subject.kind)) %>
+  <% if @subject.parent %> · from <%= link_to "#{@subject.parent.name} (#{@subject.parent.kind.name})", subject_path(@subject.parent) %><% end %>
   <% if @subject.entry %> · of <%= link_to @subject.entry.name, entry_path(@subject.entry) %><% end %>
 </div>
 <div class="page-header">
@@ -18,14 +19,29 @@
   <%= render "subjects/picks", subject: @subject %>
 </section>
 
-<section class="window" id="generate">
-  <h2>Generate</h2>
-  <%= render "subjects/generate", subject: @subject %>
-</section>
+<% if @subject.sheet? %>
+  <section class="window" id="generate">
+    <h2>The sheet</h2>
+    <%= render "subjects/sheet", subject: @subject %>
+  </section>
+  <%= render "subjects/batches", subject: @subject %>
+<% else %>
+  <section class="window" id="generate">
+    <h2>Generate</h2>
+    <%= render "subjects/generate", subject: @subject %>
+  </section>
 
-<%= render "subjects/batches", subject: @subject %>
+  <%= render "subjects/batches", subject: @subject %>
 
-<section class="window" id="variants">
-  <h2>Variants</h2>
-  <%= render "subjects/variants", subject: @subject %>
-</section>
+  <section class="window" id="variants">
+    <h2>Variants</h2>
+    <%= render "subjects/variants", subject: @subject %>
+  </section>
+<% end %>
+
+<% if (kinds = @subject.derivable_kinds).any? %>
+  <section class="window" id="derived">
+    <h2>Derived from <%= @subject.name %></h2>
+    <%= render "subjects/derived", subject: @subject, kinds: kinds %>
+  </section>
+<% end %>

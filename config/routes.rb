@@ -55,12 +55,14 @@ Rails.application.routes.draw do
     end
   end
 
-  # A subject's studio (show), its own layer (edit), its variants, and the
+  # A subject's studio (show), its own layer (edit), its variants, the
+  # subjects derived from it (Cid's portrait, his design sheet), and the
   # batches that make candidates for it; the panel is the batches alone, for
   # the frame that reloads as files land.
   resources :subjects, only: %i[show edit update destroy] do
     scope module: :subjects do
       resources :variants, only: %i[create update destroy]
+      resources :derivations, only: :create
       resources :batches, only: %i[create destroy]
       resource :panel, only: :show
     end

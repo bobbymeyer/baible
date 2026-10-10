@@ -20,8 +20,9 @@
   </div>
   <% if image %>
     <%= render "shared/model_field", name: "subject[model]", id: "subject_model", value: subject.model,
-                                     inherited: ArtDirection.pick_model(subject.kind.model, project.model, Comfy.config[:model]) %>
-    <%= render "shared/loras", name: "subject[loras]", loras: subject.loras, above: ArtDirection.stack_loras(project.loras, subject.kind.loras, subject.entry_loras) %>
+                                     inherited: ArtDirection.pick_model(subject.kind.model, *subject.ancestors.map(&:model), project.model, Comfy.config[:model]) %>
+    <%= render "shared/loras", name: "subject[loras]", loras: subject.loras,
+                               above: ArtDirection.stack_loras(project.loras, subject.kind.loras, subject.entry_loras, subject.parent_loras) %>
   <% else %>
     <div class="field">
       <%= label_tag "subject_lyrics", "Lyrics (blank for instrumental)" %>
@@ -64,19 +65,26 @@
     </p>
 
     <% choices = chain_choices(project) %>
+    <% start = subject.kind.derived_start if subject.parent %>
+    <% if start %>
+      <% choices = [ [ "As #{subject.kind.name} says", [ [ "#{subject.kind.derive == 'head' ? 'The head of ' : ''}#{subject.parent.name}'s picture (a variant: #{subject.name}'s own, once picked)", "derived" ] ] ], *choices ] %>
+    <% end %>
     <fieldset class="panel">
       <legend>Start from a pick (optional)</legend>
+      <% if start && !subject.parent.pick_for(nil)&.image? %>
+        <p class="hint"><%= subject.parent.name %> has no picture yet, so this starts from words until one is picked.</p>
+      <% end %>
       <% if choices.empty? %>
         <p class="hint">Nothing picked in <%= project.name %> yet. Once something is, a batch can redraw it: a portrait from a sprite's head, an expression from the neutral face.</p>
       <% else %>
         <div class="field-row">
           <div class="field field--wide">
             <%= label_tag :from_pick_id, "Redraw" %>
-            <%= select_tag :from_pick_id, grouped_options_for_select(choices), include_blank: "Nothing: from the prompt alone" %>
+            <%= select_tag :from_pick_id, grouped_options_for_select(choices, ("derived" if start)), include_blank: "Nothing: from the prompt alone" %>
           </div>
           <div class="field">
             <%= label_tag :denoise, "Re-noise" %>
-            <%= number_field_tag :denoise, nil, min: 0.1, max: 1, step: 0.05, placeholder: Comfy.config.fetch(:chain, {})[:denoise].to_s %>
+            <%= number_field_tag :denoise, nil, min: 0.1, max: 1, step: 0.05, placeholder: (start || {})["denoise"] || Comfy.config.fetch(:chain, {})[:denoise].to_s %>
           </div>
           <div class="field field--check">
             <%= check_box_tag :crop, "head", false %>
@@ -85,7 +93,7 @@
         </div>
         <p class="hint">
           Lower keeps more of the picture. “Only the head” cuts it square from a full-body figure (a sprite to a portrait);
-          blank re-noise is <%= Comfy.config.fetch(:chain, {})[:head_denoise] %> for a head, <%= Comfy.config.fetch(:chain, {})[:denoise] %> otherwise.
+          blank re-noise is <%= Comfy.config.fetch(:chain, {})[:head_denoise] %> for a head, <%= Comfy.config.fetch(:chain, {})[:denoise] %> otherwise<%= ", and #{subject.kind.name}'s own when it starts as its kind says (the head too, if so)" if start %>.
           The first candidate takes the pick's seed, so the face holds.
         </p>
       <% end %>

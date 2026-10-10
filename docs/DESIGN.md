@@ -27,7 +27,8 @@ The stylesheet is `app/assets/stylesheets/application.css`, taken from polychrom
 - Type is near-black on white. Controls are grey (`--control`): links, buttons, forms, picking.
 - **Red is for spending ComfyUI's time** (`.generate`): Generate, and "Train in ComfyUI". Nothing
   else is red. In polychrome red marks game moves; here the "move" is reaching ComfyUI.
-  "Queue for tonight" and "Train tonight" are grey: they spend nothing now.
+  "Queue for tonight" and "Train tonight" are grey: they spend nothing now, and so is "Lay out the
+  sheet", which baible does itself.
 - Alerts carry a red edge; notices an ink one.
 - Generated images and their checkerboard are content, in their own colours.
 
@@ -37,6 +38,7 @@ The stylesheet is `app/assets/stylesheets/application.css`, taken from polychrom
 | --- | --- |
 | Image kind | Small black square before its name |
 | Audio kind | Small black circle before its name |
+| Sheet kind | Small outlined square before its name: arranged, not drawn |
 | A subject or target with no pick | An outlined square plate (a `?`, or the subject's initial) |
 | Audio with no picture | A filled black circle in the plate |
 | Transparency | A light checkerboard behind the image |

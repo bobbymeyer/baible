@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-# Drives a Batch (docs/HANDOFF.md "Batches, candidates, picks"): submits its
+# Drives a Batch (docs/HANDOFF.md "Batches, candidates, picks"): lays out a
+# sheet's, or submits its
 # candidates to ComfyUI, then checks back every few seconds and collects
 # each file as it lands, until all are in, the batch fails, or it times out
 # (ApplicationJob#poll_comfy).
@@ -17,6 +18,8 @@ class BatchJob < ApplicationJob
   end
 
   def perform(batch, client: Comfy.client, llm: Llm.enabled? ? Llm.client : nil)
+    return batch.compose_sheet! if batch.sheet? # laid out here: no ComfyUI
+
     poll_comfy(batch, client) do
       batch.write_prompt!(llm) if llm
       batch.upload_source!(client)

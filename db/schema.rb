@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -100,7 +100,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_110000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "learned_workflow_id"
+    t.integer "parent_id"
+    t.string "derive", default: "words", null: false
+    t.float "derive_denoise"
+    t.json "sheet_kind_ids", default: [], null: false
     t.index ["learned_workflow_id"], name: "index_kinds_on_learned_workflow_id"
+    t.index ["parent_id"], name: "index_kinds_on_parent_id"
     t.index ["project_id", "name"], name: "index_kinds_on_project_id_and_name", unique: true
     t.index ["project_id"], name: "index_kinds_on_project_id"
   end
@@ -258,9 +263,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_110000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "entry_id"
+    t.integer "parent_id"
     t.index ["entry_id"], name: "index_subjects_on_entry_id"
     t.index ["kind_id", "name"], name: "index_subjects_on_kind_id_and_name", unique: true
     t.index ["kind_id"], name: "index_subjects_on_kind_id"
+    t.index ["parent_id"], name: "index_subjects_on_parent_id"
     t.index ["project_id"], name: "index_subjects_on_project_id"
   end
 

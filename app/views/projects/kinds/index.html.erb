@@ -5,13 +5,19 @@
   <div class="actions">
     <%= link_to "New image kind", new_project_kind_path(@project, medium: "image"), class: "button" %>
     <%= link_to "New audio kind", new_project_kind_path(@project, medium: "audio"), class: "button button--quiet" %>
+    <%= link_to "New sheet", new_project_kind_path(@project, medium: "sheet"), class: "button button--quiet" %>
   </div>
 </div>
 <p class="prose">
   Every recipe is made in layers: <%= link_to "#{@project.name}'s house style", edit_project_path(@project) %>, then the framing for its
-  kind, then the look of the entry it depicts (if any), then the subject's own words, then a variant's. Any image layer can name a model, and the lowest one that does wins.
+  kind, then the look of the entry it depicts (if any), then what the subject derives from (Cid, for his portrait), then the subject's own words, then a variant's. Any image layer can name a model, and the lowest one that does wins.
   LoRAs stack in layer order; a later layer that names the same LoRA changes its strength or switches it off.
   The ComfyUI workflow is built for each image from the model's family and what ComfyUI has installed.
+</p>
+<p class="prose">
+  A kind can derive from another: a Portrait, a Turnaround or a Battle sprite from a Character. Its subjects are then each of one of that
+  kind's subjects, and can start from its picture. A sheet makes nothing itself: it lays the picks of what derives from one subject out as
+  one picture, a design sheet.
 </p>
 
 <section class="window">
@@ -30,13 +36,22 @@
   <section class="window" id="<%= dom_id(kind) %>">
     <h2><span class="medium medium--<%= kind.medium %>" title="<%= kind.medium.humanize %>"></span><%= kind.name %></h2>
     <dl class="facts">
-      <dt>Framing</dt><dd><%= kind.prompt.presence || tag.span("none", class: "muted") %></dd>
-      <% if kind.image? %>
+      <% if kind.parent %>
+        <dt>From</dt><dd><%= kind.parent.name %><%= ": #{Kind::DERIVE.fetch(kind.derive).downcase}" if kind.image? %><%= ", re-noised #{kind.derive_denoise}" if kind.image? && kind.derive_denoise && kind.derive != "words" %></dd>
+      <% end %>
+      <% if kind.derived_kinds.any? %>
+        <dt>Derived</dt><dd><%= kind.derived_kinds.map(&:name).to_sentence %></dd>
+      <% end %>
+      <% if kind.sheet? %>
+        <dt>Lays out</dt><dd><%= kind.sheet_kinds.map(&:name).to_sentence.presence || tag.span("nothing yet", class: "muted") %></dd>
+      <% elsif kind.image? %>
+        <dt>Framing</dt><dd><%= kind.prompt.presence || tag.span("none", class: "muted") %></dd>
         <dt>Negative</dt><dd><%= kind.negative.presence || tag.span("none", class: "muted") %></dd>
         <dt>Size</dt><dd><%= kind.width %> × <%= kind.height %><%= ", background removed" if kind.transparent %></dd>
         <dt>Model</dt><dd><code><%= kind.model.presence || "inherited" %></code></dd>
         <dt>LoRAs</dt><dd><%= lora_stack(kind.loras) %></dd>
       <% else %>
+        <dt>Framing</dt><dd><%= kind.prompt.presence || tag.span("none", class: "muted") %></dd>
         <dt>Length</dt><dd><%= kind.seconds %> seconds</dd>
         <dt>Model</dt><dd><code><%= kind.model.presence || Comfy::Music.default_model %></code></dd>
       <% end %>

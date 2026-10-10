@@ -214,6 +214,9 @@ pre.log { white-space: pre-wrap; max-height: 320px; overflow: auto; background: 
 .field-row > .field--wide { flex: 3 1 320px; }
 .field--check { flex-direction: row; align-items: center; gap: 8px; min-height: 40px; }
 .field--check .hint { margin: 0; }
+/* Several checkboxes for one field, side by side (a sheet's kinds). */
+.checks { display: flex; flex-wrap: wrap; gap: 0 var(--gutter); }
+.checks .field--check { display: flex; }
 .panel legend { padding: 0; font-size: 16px; font-weight: 700; }
 fieldset.panel { border-left: 0; border-right: 0; border-bottom: 0; min-width: 0; }
 input, select, textarea {
@@ -254,6 +257,8 @@ details[open] > summary { margin-bottom: 16px; }
 /* A kind's medium as a shape: a square for an image, a circle for audio. */
 .medium { display: inline-block; width: 10px; height: 10px; margin-right: 8px; background: var(--ink); vertical-align: 0; }
 .medium--audio { border-radius: 50%; }
+/* A sheet: an outlined square, made of other pictures rather than drawn. */
+.medium--sheet { background: none; box-shadow: inset 0 0 0 2px var(--ink); }
 
 /* Subjects in a kind: thumbnails of their picks, or a plate with their initial. */
 .subject-grid { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); gap: 24px var(--gutter); }
@@ -261,6 +266,14 @@ details[open] > summary { margin-bottom: 16px; }
 .subject-tile a:hover strong { text-decoration: underline; }
 .subject-tile strong { display: block; margin-top: 8px; font-size: 14px; line-height: 20px; }
 .subject-tile small { display: block; font-size: 12px; line-height: 16px; color: var(--grey); }
+.subject-tile.is-empty .link-button { margin-top: 4px; }
+
+/* What a sheet lays out: a row for each subject, its pictures small. */
+.sheet-plan { list-style: none; margin: 16px 0 24px; padding: 0; }
+.sheet-plan > li { padding: 8px 0; border-top: 1px solid var(--rule); }
+.sheet-plan__cells { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 16px; }
+.sheet-plan__cells li { width: 96px; }
+.sheet-plan__cells small { display: block; font-size: 12px; line-height: 16px; color: var(--grey); }
 .thumb, .plate {
   display: grid; place-items: center; width: 100%; aspect-ratio: 1; object-fit: contain;
   background-color: var(--wash);
