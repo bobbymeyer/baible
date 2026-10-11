@@ -24,15 +24,22 @@ Rails.application.routes.draw do
 
   # Projects, the top layer; their kinds (the middle layer, "art direction"),
   # their entries (the bible: Cid, across every kind he's made in), and making
-  # subjects in them. A project's manifest lists its picks.
+  # subjects in them. A project's manifest lists its picks; its skeleton, what
+  # it's made of.
   resources :projects do
     scope module: :projects do
       resources :kinds, except: :show
       resources :entries, only: %i[index new create]
       resources :subjects, only: %i[new create]
       resource :manifest, only: :show
+      resource :skeleton, only: :show
     end
   end
+
+  # Importing a design skeleton: the assets another project needs, as
+  # placeholders (docs/HANDOFF.md "Import: skeletons"). A project's own
+  # skeleton is projects/:id/skeleton.
+  resources :skeletons, only: %i[new create]
 
   # An entry's page in the bible (show): its lore, its look and every
   # subject made of it; editing it; the notes on it; and its LoRA training

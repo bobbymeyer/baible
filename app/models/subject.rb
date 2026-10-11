@@ -28,9 +28,11 @@ class Subject < ApplicationRecord
   has_many :batches, dependent: :destroy
   has_many :picks, dependent: :destroy
 
-  normalizes :name, :notes, :model, :lyrics, with: ->(value) { value.to_s.strip.presence }
+  normalizes :name, :notes, :model, :lyrics, :ref, with: ->(value) { value.to_s.strip.presence }
 
   validates :name, presence: true, uniqueness: { scope: :kind_id }
+  # What another project calls it (a skeleton's asset, Skeleton), given back in its sidecars.
+  validates :ref, uniqueness: { scope: :project_id }, allow_nil: true
   validates :seconds, numericality: { only_integer: true, in: Kind::SECONDS }, allow_nil: true
   validate :kind_in_project, :entry_in_project, :parent_fits
 

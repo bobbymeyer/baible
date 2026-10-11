@@ -70,8 +70,8 @@ SiteSetting (one row)   User ─ Session
 | `LearnedWorkflow` | A ComfyUI graph the language model wrote from a description, with placeholders (section 4) | `name` (unique), `purpose`, `graph`, `outline`, and the same status columns |
 | `Trial` | A test render of a learned family or workflow | `learnable` (either), `status` (as a batch), `error`, `prompt`, `seed`, `comfy_prompt_id`, `submitted_at`, `run_seconds`, attached `image` |
 | `Note` | A note on an entry: a question, a decision, a note to whoever draws it next. Never in a prompt | `entry`, `user` (null once their account goes), `body` |
-| `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `parent` (the subject it derives from, optional), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
-| `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt` |
+| `Subject` | The thing made: a goblin, Cid, the harbour town, its theme; the subject layer | `kind`, `entry` (optional), `parent` (the subject it derives from, optional), `ref` (what another project calls it, unique in the project: section 9), `name` (unique in its kind), `notes`, `model`, `loras`, `lyrics`, `seconds` |
+| `Variant` | A detail layer after a subject ("happy": "smiling happily") | `name` (unique in its subject), `prompt`, `ref` |
 | `Batch` | One round for a **target**: a subject (`variant` nil) or one of its variants; or one queued for the night (section 7) | `recipe` (frozen at start), `status` (`scheduled` for tonight, then `queued` …), `error`, `night`, `released_at`, `submitted_at` |
 | `Candidate` | One ComfyUI prompt in a batch, with its own seed, and the file it made | `seed`, `comfy_prompt_id`, `status`, `transparent`, `run_seconds`, attached `file` |
 | `Pick` | A chosen file for a target, and how it was made. Kept: a target has a history, one `current` pick and at most one canon pick (section 5) | `seed`, `prompt`, `recipe`, `run_seconds`, `user` (who picked it), `current`, `canon_at`, `canon_by` (a user), attached `file` |
@@ -501,17 +501,21 @@ environment (`COMFY_TOKEN`, `COMFY_HEADERS`, basic auth in `COMFY_URL`, `LLM_TOK
 and a URL with a password in it is refused. `ConnectionCheck` explains, step by step, why ComfyUI
 or the language model can't be reached (also `bin/rails services:check`).
 
-## 9. Export
+## 9. Export and import
 
-Assets leave baible as files. There is no API.
+Assets leave baible as files, and what's needed can come in as one (a skeleton, below). There is
+no API.
 
 - `GET /picks/:id/download`: the pick's file, as an attachment (`<subject>[-<variant>]-<seed>.png`,
   or `.mp3`/`.flac`).
 - `GET /picks/:id/sidecar`: its sidecar, `<same stem>.json`.
 - `GET /projects/:id/manifest`: the pick that stands for each target in the project (its canon,
   else its current pick), as JSON:
-  `{ "baible": 1, "project", "exported_at", "picks": [ <sidecar> + "download_url", "sidecar_url" ] }`.
+  `{ "baible": 1, "project", "exported_at", "picks": [ <sidecar> + "download_url", "sidecar_url" ],
+  "missing": [{ "ref", "subject_ref", "kind", "entry", "subject", "variant" }] }`: `missing` is every
+  target with nothing picked yet, so a project that sent a skeleton can see what's still to come.
   No archive (no zip gem): fetch what it lists, signed in.
+- `GET /projects/:id/skeleton`: the project as a skeleton (below).
 
 ### The sidecar (version 1)
 
@@ -528,6 +532,8 @@ Every key is always present; what doesn't apply is `null`. `Pick#sidecar`.
 | `project`, `kind`, `subject` | string | Names, where it sits in baible |
 | `entry` | string \| null | The entry the subject depicts, or null |
 | `variant` | string \| null | The variant's name, or null for the subject itself |
+| `ref` | string \| null | What another project calls this target (the variant's ref, or the subject's), from its skeleton; null when none |
+| `subject_ref` | string \| null | The subject's ref, whichever its target |
 | `picked_by` | string \| null | The email address of whoever picked it; null when unknown or gone |
 | `canon` | boolean | Whether it is its target's canon pick |
 | `canon_by`, `canon_at` | string \| null | Who approved it as canon, and when (ISO 8601, UTC) |
@@ -546,6 +552,53 @@ Every key is always present; what doesn't apply is `null`. `Pick#sidecar`.
 | `run_seconds` | number \| null | Seconds ComfyUI spent on it |
 | `picked_at` | string | When it was picked, ISO 8601, UTC |
 | `recipe` | object | The full recipe (section 3), enough to make it again |
+
+### Import: skeletons
+
+Another project (polychrome, a game, a comic's script tool) can say what it needs in one file, a
+**skeleton**, and baible makes a placeholder for each: a subject with nothing picked yet, which
+the studio, a standing order ("Fill the gaps") or the night shift then fills. Each asset can carry
+the other project's own name for it, its `ref`, which every pick of it gives back in its sidecar
+and the manifest. So that project writes an exporter once, and reads the manifest back to know which
+file is which, and what's still missing. Still files, not an API.
+
+```json
+{
+  "baible_skeleton": 1,
+  "source": "polychrome",
+  "project": { "name": "The Drowned Coast", "description": "…", "style": "…", "negative": "…", "sound": "…" },
+  "starter_kinds": true,
+  "kinds": [{ "name": "Battle sprite", "medium": "image", "from": "Character", "derive": "picture",
+              "prompt": "…", "negative": "…", "width": 832, "height": 1216, "transparent": true,
+              "seconds": 60, "derive_denoise": 0.6, "sheet_of": ["…"], "variants": { "attack": "lunging" } }],
+  "entries": [{ "name": "Cid", "look": "…", "lore": "…" }],
+  "assets": [{ "ref": "speaker/12/portrait", "kind": "Portrait", "name": "Cid", "entry": "Cid",
+               "from": "speaker/12", "notes": "…", "lyrics": "…", "seconds": 90,
+               "variants": [{ "name": "happy", "prompt": "…", "ref": "speaker/12/portrait/happy" }] }]
+}
+```
+
+- **Only `baible_skeleton` (1) is required**, and the project's `name` when it makes a new project.
+  Everything else is optional. `source` is a note, for people.
+- **The project** is the one the import page is opened from, else the one the file names, made if
+  new (with the starter kinds, unless `starter_kinds` is false). Kinds are rows as in
+  config/comfy.yml's `kinds` (`Kind.row_attributes`), made when the project hasn't one of that
+  name; `from` names a kind it has or one before it in the file. Entries are matched by name.
+- **Assets** are matched by `ref`, else by kind and name, and made when new, as the studio would
+  (with the kind's preset variants). `kind` must be one the project has or the file makes. `entry`
+  names an entry (made if new). `from` is the asset it derives from (section 5): its `ref`, or
+  `{ "kind", "name" }`, wherever it is in the file. `variants` are rows, or `{ name: words }`.
+- **Importing again is safe**: nothing is made twice, blanks are filled (notes, a look, a ref), and
+  nothing edited in baible is overwritten or removed. Assets with a ref that the file no longer
+  lists stay, and the import says how many. `Subject#ref` is unique in its project and can be
+  edited on the subject's edit page.
+- **All or nothing**: anything wrong (an unknown kind, a ref used twice, a `from` that is no asset,
+  a parent its kind can't derive from, a file that isn't JSON or isn't version 1) stops the whole
+  import in one transaction, and the page lists every problem with where it is (`assets[3] (Cid)`).
+- **A project's own skeleton** (`Skeleton.export`) is the same format: its kinds, entries and every
+  subject with its ref, parent and variants. Imported under another name, it makes the same
+  placeholders. It's also a full example for whoever writes an exporter.
+- Bump `baible_skeleton` when a key changes meaning or goes; new optional keys don't.
 
 ### Into polychrome
 

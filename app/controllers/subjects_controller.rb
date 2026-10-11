@@ -37,6 +37,6 @@ class SubjectsController < ApplicationController
   end
 
   def subject_params
-    params.expect(subject: [ :name, :kind_id, :entry_id, :parent_id, :notes, :model, :lyrics, :seconds, { loras: {} } ])
+    params.expect(subject: [ :name, :ref, :kind_id, :entry_id, :parent_id, :notes, :model, :lyrics, :seconds, { loras: {} } ])
   end
 end

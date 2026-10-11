@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_11_010000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -264,10 +264,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.datetime "updated_at", null: false
     t.integer "entry_id"
     t.integer "parent_id"
+    t.string "ref"
     t.index ["entry_id"], name: "index_subjects_on_entry_id"
     t.index ["kind_id", "name"], name: "index_subjects_on_kind_id_and_name", unique: true
     t.index ["kind_id"], name: "index_subjects_on_kind_id"
     t.index ["parent_id"], name: "index_subjects_on_parent_id"
+    t.index ["project_id", "ref"], name: "index_subjects_on_project_id_and_ref", unique: true, where: "ref IS NOT NULL"
     t.index ["project_id"], name: "index_subjects_on_project_id"
   end
 
@@ -327,6 +329,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_120000) do
     t.integer "position", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "ref"
     t.index ["subject_id", "name"], name: "index_variants_on_subject_id_and_name", unique: true
     t.index ["subject_id"], name: "index_variants_on_subject_id"
   end

@@ -22,14 +22,19 @@ class Project < ApplicationRecord
     super(ArtDirection.loras(value))
   end
 
-  # The kinds config/comfy.yml starts a project with (`kinds`). A kind
-  # derives from one named before it (`from`); a sheet lays out the kinds it
-  # names (`sheet_of`), or all that derive from its parent.
-  def add_starter_kinds!
+  # The kinds config/comfy.yml starts a project with (`kinds`).
+  def add_starter_kinds! = add_kinds!(Kind.starters)
+
+  # Kinds it doesn't have yet, from rows of Kind.row_attributes; those it
+  # has are left as they are. A kind derives from one it has or one named
+  # before it (`from`); a sheet lays out the kinds it names (`sheet_of`),
+  # or all that derive from its parent. Returns the kinds made.
+  def add_kinds!(rows)
     transaction do
-      Kind.starters.each_with_index do |attrs, i|
-        kinds.find_or_create_by!(name: attrs["name"]) do |kind|
-          kind.assign_attributes(attrs.except("name", "from", "sheet_of").merge("position" => i))
+      rows.filter_map do |attrs|
+        next if kinds.exists?(name: attrs["name"].to_s.strip)
+
+        kinds.create!(attrs.except("from", "sheet_of").merge("position" => kinds.maximum(:position).to_i + 1)) do |kind|
           kind.parent = kinds.find_by(name: attrs["from"]) if attrs["from"]
           kind.sheet_kind_ids = kinds.where(name: Array(attrs["sheet_of"])).pluck(:id)
         end

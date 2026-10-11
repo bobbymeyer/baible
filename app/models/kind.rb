@@ -49,15 +49,19 @@ class Kind < ApplicationRecord
   validate :learned_workflow_is_accepted, if: :learned_workflow_id_changed?
   validate :parent_fits
 
-  # From config/comfy.yml `kinds`, as attributes.
-  def self.starters
-    Array(Comfy.config[:kinds]).map do |row|
-      row = row.to_h.deep_stringify_keys
-      presets = row.delete("variants").to_h.map { |name, words| { "name" => name.to_s, "prompt" => words.to_s } }
-      row.slice("name", "medium", "prompt", "negative", "width", "height", "transparent", "seconds", "derive", "derive_denoise", "from", "sheet_of")
-         .merge("variant_presets" => presets)
-    end
+  # A row as config/comfy.yml `kinds` and a skeleton write one, as
+  # attributes: what it names of these, `variants` ({ name => words }) as
+  # presets, and `from` and `sheet_of` by kind name (Project#add_kinds!).
+  ROW_KEYS = %w[name medium prompt negative width height transparent seconds derive derive_denoise from sheet_of].freeze
+
+  def self.row_attributes(row)
+    row = row.to_h.deep_stringify_keys
+    presets = row["variants"].to_h.map { |name, words| { "name" => name.to_s, "prompt" => words.to_s } }
+    row.slice(*ROW_KEYS).merge("variant_presets" => presets)
   end
+
+  # From config/comfy.yml `kinds`, as attributes.
+  def self.starters = Array(Comfy.config[:kinds]).map { |row| row_attributes(row) }
 
   def image? = medium == "image"
   def audio? = medium == "audio"

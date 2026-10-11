@@ -7,6 +7,7 @@
     <%= link_to "Bible", project_entries_path(@project), class: "button button--quiet" %>
     <%= link_to "Kinds", project_kinds_path(@project), class: "button button--quiet" %>
     <%= link_to "Download the manifest", project_manifest_path(@project), class: "button button--quiet" %>
+    <%= link_to "Skeleton", new_skeleton_path(project_id: @project.id), class: "button button--quiet", title: "Import the assets another project needs, or download this one's" %>
     <%= link_to "New subject", new_project_subject_path(@project), class: "button" %>
   </div>
 </div>
