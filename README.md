@@ -187,6 +187,16 @@ container healthcheck or a deploy gate; `/up` and the signed-out redirect never 
 `deploy/studio/` has the compose file and notes for running baible on a Mac behind Caddy on a
 tailnet, beside native ComfyUI and llama-swap.
 
+## Importing what another project needs
+
+**Import a skeleton** (on Projects, or a project's **Skeleton** button) takes a JSON file listing the
+assets another project needs, and makes each a placeholder: a subject with nothing picked yet, in the
+kind it names, with its variants, its entry, and what it derives from. Give each asset the other
+project's own id as its `ref`: every pick of it carries the ref back in its sidecar, and the project's
+manifest lists each pick's ref and what's still `missing`. Importing again only adds what's new.
+A project's own skeleton (its **Skeleton** page) is a complete example of the format; HANDOFF "Import:
+skeletons" has the details.
+
 ## Bringing assets into polychrome
 
 polychrome only takes uploads; there's no API between the two.
@@ -208,6 +218,7 @@ polychrome's expressions, the subject itself being Neutral), Scene (scene panels
 | `app/models/batch.rb`, `candidate.rb`, `pick.rb`, `app/jobs/batch_job.rb` | Generating, collecting, picking; `Pick#sidecar` |
 | `app/models/comfy/`, `remote.rb`, `llm/`, `prompt_writer.rb` | ComfyUI and the language model over HTTP, workflow building |
 | `app/models/learned_family.rb`, `learned_workflow.rb`, `trial.rb`, `family_writer.rb`, `workflow_writer.rb`, `comfy/*_check.rb` | Families and workflows the language model writes, checked, tried and accepted |
+| `app/models/skeleton.rb`, `sheet.rb` | Importing and exporting skeletons; laying out sheets |
 | `app/models/cutout.rb`, `headshot.rb` | Background removal and its mending; the head cut for chains |
 | `app/models/site_setting.rb`, `connection_check.rb` | Settings and the step-by-step connection check |
 | `app/controllers/subjects/`, `candidates/`, `picks/`, `projects/` | Nested resources (verbs as resources) |

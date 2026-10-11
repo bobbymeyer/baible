@@ -113,6 +113,8 @@ class Pick < ApplicationRecord
       "entry" => subject.entry&.name,
       "subject" => subject.name,
       "variant" => variant&.name,
+      "ref" => variant ? variant.ref : subject.ref,
+      "subject_ref" => subject.ref,
       "picked_by" => user&.email_address,
       "canon" => canon?,
       "canon_by" => canon_by&.email_address,

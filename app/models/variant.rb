@@ -9,7 +9,7 @@ class Variant < ApplicationRecord
   has_many :batches, dependent: :destroy
   has_many :picks, dependent: :destroy
 
-  normalizes :name, :prompt, with: ->(value) { value.to_s.strip.presence }
+  normalizes :name, :prompt, :ref, with: ->(value) { value.to_s.strip.presence }
 
   validates :name, presence: true, uniqueness: { scope: :subject_id }
 end

@@ -29,7 +29,7 @@ RSpec.describe "Exporting picks", type: :request do
     expect(response.media_type).to eq("application/json")
     expect(response.headers["Content-Disposition"]).to include("attachment", "cid-#{pick.seed}.json")
     sidecar = JSON.parse(response.body)
-    expect(sidecar.keys).to eq(%w[baible file content_type byte_size sha256 medium project kind entry subject variant picked_by canon canon_by canon_at seed prompt negative model family
+    expect(sidecar.keys).to eq(%w[baible file content_type byte_size sha256 medium project kind entry subject variant ref subject_ref picked_by canon canon_by canon_at seed prompt negative model family
                                   loras width height transparent lyrics seconds source workflow run_seconds picked_at recipe])
     expect(sidecar).to include(
       "baible" => 1, "file" => "cid-#{pick.seed}.png", "content_type" => "image/png", "medium" => "image",

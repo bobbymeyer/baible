@@ -1,0 +1,58 @@
+<% content_for :title, "Import a skeleton" %>
+<div class="crumbs"><%= link_to "Projects", projects_path %><% if @project %> / <%= link_to @project.name, project_path(@project) %><% end %></div>
+<h1>Import a skeleton</h1>
+<p class="prose">
+  A skeleton is the list of assets another project needs, as JSON: each becomes a placeholder here, a subject with nothing picked yet,
+  ready to generate (or for a standing order to fill overnight). What it calls each one (its <code>ref</code>) comes back in every
+  pick's sidecar and in the manifest, with what's still missing. Importing again only adds what's new and fills blanks; nothing changed
+  here is overwritten.
+</p>
+<% if @project %>
+  <p><%= link_to "Download #{@project.name}'s own skeleton", project_skeleton_path(@project) %> <span class="muted">(its kinds, entries and subjects, with their refs)</span></p>
+<% end %>
+
+<% if @problems.present? %>
+  <div class="form-errors" role="alert">
+    <p>Nothing was imported:</p>
+    <ul><% @problems.each do |problem| %><li><%= problem %></li><% end %></ul>
+  </div>
+<% end %>
+
+<%= form_with url: skeletons_path, class: "form", multipart: true do %>
+  <div class="field">
+    <%= label_tag :file, "The skeleton (.json)" %>
+    <%= file_field_tag :file, accept: "application/json,.json" %>
+  </div>
+  <div class="field">
+    <%= label_tag :json, "Or paste it" %>
+    <%= text_area_tag :json, params[:json], rows: 10, class: "code", placeholder: '{ "baible_skeleton": 1, "project": { "name": "The Drowned Coast" }, "assets": [ … ] }' %>
+  </div>
+  <div class="field">
+    <%= label_tag :project_id, "Into" %>
+    <%= select_tag :project_id, options_from_collection_for_select(Project.order(:name), :id, :name, @project&.id),
+                   include_blank: "The project it names (made if it's new)" %>
+  </div>
+  <div class="actions"><%= submit_tag "Import", class: "button button--primary" %></div>
+<% end %>
+
+<section class="window">
+  <h2>The format</h2>
+  <p class="hint">
+    Only <code>baible_skeleton</code> and, for a new project, its name are needed. Kinds, entries and variants it names are made when
+    they're new; an asset's <code>kind</code> must be one the project has or the skeleton makes. <code>from</code> is the asset it derives
+    from (its ref, or <code>{ "kind", "name" }</code>). Any project's own skeleton is a full example: “Download its skeleton” on its page.
+    The details are in HANDOFF, “Import: skeletons”.
+  </p>
+  <pre class="log"><%= JSON.pretty_generate(
+    "baible_skeleton" => 1, "source" => "polychrome",
+    "project" => { "name" => "The Drowned Coast", "style" => "ink wash, muted sea colours" },
+    "kinds" => [ { "name" => "Battle sprite", "from" => "Character", "derive" => "picture", "width" => 832, "height" => 1216 } ],
+    "entries" => [ { "name" => "Cid", "look" => "white beard, eyepatch over the left eye", "lore" => "The harbourmaster." } ],
+    "assets" => [
+      { "ref" => "speaker/12", "kind" => "Character", "name" => "Cid", "entry" => "Cid", "notes" => "red coat, brass buttons" },
+      { "ref" => "speaker/12/portrait", "kind" => "Portrait", "name" => "Cid", "from" => "speaker/12",
+        "variants" => [ { "name" => "happy", "ref" => "speaker/12/portrait/happy" } ] },
+      { "ref" => "bestiary/3", "kind" => "Creature", "name" => "Drowned sailor", "notes" => "barnacled, a broken lantern" }
+    ]
+  ) %></pre>
+</section>

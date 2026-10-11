@@ -6,6 +6,7 @@
   <%= link_to @subject.kind.name, project_path(@project, anchor: dom_id(@subject.kind)) %>
   <% if @subject.parent %> · from <%= link_to "#{@subject.parent.name} (#{@subject.parent.kind.name})", subject_path(@subject.parent) %><% end %>
   <% if @subject.entry %> · of <%= link_to @subject.entry.name, entry_path(@subject.entry) %><% end %>
+  <% if @subject.ref %> · <code title="What the project it came from calls it"><%= @subject.ref %></code><% end %>
 </div>
 <div class="page-header">
   <h1><%= @subject.name %></h1>

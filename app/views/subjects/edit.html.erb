@@ -24,6 +24,11 @@
       <p class="hint">A subject of the kind its kind derives from (or of one derived from that).</p>
     </div>
   <% end %>
+  <div class="field">
+    <%= f.label :ref, "Ref" %>
+    <%= f.text_field :ref, class: "code", placeholder: "speaker/12" %>
+    <p class="hint">What another project calls it, as its skeleton said (<%= link_to "Import a skeleton", new_skeleton_path(project_id: @project.id) %>): given back in each pick's sidecar and the manifest.</p>
+  </div>
   <p class="hint">Notes, model and LoRAs are edited in the studio, where they're generated with.</p>
   <div class="actions">
     <%= f.submit "Save", class: "button button--primary" %>
