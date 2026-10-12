@@ -194,8 +194,9 @@ assets another project needs, and makes each a placeholder: a subject with nothi
 kind it names, with its variants, its entry, and what it derives from. Give each asset the other
 project's own id as its `ref`: every pick of it carries the ref back in its sidecar, and the project's
 manifest lists each pick's ref and what's still `missing`. Importing again only adds what's new.
-A project's own skeleton (its **Skeleton** page) is a complete example of the format; HANDOFF "Import:
-skeletons" has the details.
+The format, for whoever writes the exporter, is [docs/SKELETON.md](docs/SKELETON.md), with an example
+([docs/skeleton.example.json](docs/skeleton.example.json)); a project's own skeleton (its **Skeleton**
+page) is another.
 
 ## Bringing assets into polychrome
 

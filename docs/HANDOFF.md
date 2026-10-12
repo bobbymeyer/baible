@@ -560,7 +560,9 @@ Another project (polychrome, a game, a comic's script tool) can say what it need
 the studio, a standing order ("Fill the gaps") or the night shift then fills. Each asset can carry
 the other project's own name for it, its `ref`, which every pick of it gives back in its sidecar
 and the manifest. So that project writes an exporter once, and reads the manifest back to know which
-file is which, and what's still missing. Still files, not an API.
+file is which, and what's still missing. Still files, not an API. The spec to give whoever writes
+an exporter is [docs/SKELETON.md](SKELETON.md), with a working example,
+[docs/skeleton.example.json](skeleton.example.json).
 
 ```json
 {
