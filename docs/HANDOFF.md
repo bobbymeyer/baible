@@ -283,10 +283,15 @@ knows kinds that derive from kinds, subjects that derive from subjects, and shee
   from it, or a sheet. It depicts its parent's entry unless it says otherwise. Its parents' layers
   come before its own (section 3). A subject of a derived kind can still stand alone (an
   unnamed guard's portrait).
-- **Where its batches start** is the kind's `derive`: `words` (its layers alone: a back view
-  can't be redrawn from a front one), `picture` (redraw the parent's picture), or `head` (the head
-  cut from it, `Headshot`), re-noised by `derive_denoise` or `chain` in config/comfy.yml.
-  A variant redraws its own subject's picture instead, once it has one: an expression from the
+- **Where its batches start** is the kind's `derive`: `words` (its layers alone), `picture`
+  (redraw the parent's picture), or `head` (the head cut from it, `Headshot`). A redraw is image to
+  image: it keeps the picture's pose and composition and changes its surface, so it suits a
+  portrait from the head or a costume in the same stance, and not a new pose. A sprite, a
+  turnaround's back view or an action shot start from words, and the design is held across poses
+  by the entry's look and its LoRA (section 6), which is the loop's point. Redrawing in a new pose
+  from a reference (an edit model, IP-Adapter) is not built; a learned workflow that takes
+  `{{source_image}}` can do it on a server that has the nodes (section 4). A redraw is re-noised
+  by `derive_denoise`, or `chain` in config/comfy.yml. A variant redraws its own subject's picture instead, once it has one: an expression from the
   neutral portrait. This is the default (`Batch.start!` with `source: :derived`; the studio
   preselects it, and it can be changed or turned off per batch), so standing orders and the night
   shift follow it too. Until the parent has a picture, it starts from words. A batch that starts

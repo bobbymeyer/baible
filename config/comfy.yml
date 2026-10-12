@@ -263,10 +263,12 @@ shared: &shared
       width: 832
       height: 1216
       transparent: false
+    # From words, not the character's picture: a redraw keeps the picture's
+    # pose and composition, and a sprite needs its own. The entry's look,
+    # and its LoRA once trained, hold the design.
     - name: Character sprite
       from: Character
-      derive: picture
-      derive_denoise: 0.6
+      derive: words
       medium: image
       prompt: "a single figure, full body, standing, facing the viewer, centered, plain white background"
       negative: "multiple people, cropped, text"
