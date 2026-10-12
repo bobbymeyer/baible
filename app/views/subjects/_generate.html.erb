@@ -67,7 +67,9 @@
     <% choices = chain_choices(project) %>
     <% start = subject.kind.derived_start if subject.parent %>
     <% if start %>
-      <% choices = [ [ "As #{subject.kind.name} says", [ [ "#{subject.kind.derive == 'head' ? 'The head of ' : ''}#{subject.parent.name}'s picture (a variant: #{subject.name}'s own, once picked)", "derived" ] ] ], *choices ] %>
+      <% how = { "head" => "The head of #{subject.parent.name}'s picture", "reference" => "#{subject.parent.name}'s picture, drawn from in a new pose" }
+                .fetch(subject.kind.derive, "#{subject.parent.name}'s picture") %>
+      <% choices = [ [ "As #{subject.kind.name} says", [ [ "#{how} (a variant: #{subject.name}'s own, once picked)", "derived" ] ] ], *choices ] %>
     <% end %>
     <fieldset class="panel">
       <legend>Start from a pick (optional)</legend>
@@ -90,11 +92,21 @@
             <%= check_box_tag :crop, "head", false %>
             <%= label_tag :crop, "Only the head" %>
           </div>
+          <div class="field field--check">
+            <%= check_box_tag :use, "reference", false %>
+            <%= label_tag :use, "Draw from it, in a new pose" %>
+          </div>
+          <div class="field">
+            <%= label_tag :weight, "Weight" %>
+            <%= number_field_tag :weight, nil, min: 0.1, max: 1.5, step: 0.05, placeholder: (start || {})["weight"] || Kind.reference_start["weight"] %>
+          </div>
         </div>
         <p class="hint">
           Lower keeps more of the picture. “Only the head” cuts it square from a full-body figure (a sprite to a portrait);
           blank re-noise is <%= Comfy.config.fetch(:chain, {})[:head_denoise] %> for a head, <%= Comfy.config.fetch(:chain, {})[:denoise] %> otherwise<%= ", and #{subject.kind.name}'s own when it starts as its kind says (the head too, if so)" if start %>.
-          The first candidate takes the pick's seed, so the face holds.
+          The first candidate takes the pick's seed, so the face holds. “Draw from it” keeps the design but not the pose: the picture goes in
+          as a reference (IP-Adapter: SDXL and SD 1.5 models, with ComfyUI_IPAdapter_plus installed) and the prompt draws on an empty canvas;
+          weight is how closely it holds the design.
         </p>
       <% end %>
     </fieldset>

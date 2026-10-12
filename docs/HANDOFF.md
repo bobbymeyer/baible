@@ -283,18 +283,29 @@ knows kinds that derive from kinds, subjects that derive from subjects, and shee
   from it, or a sheet. It depicts its parent's entry unless it says otherwise. Its parents' layers
   come before its own (section 3). A subject of a derived kind can still stand alone (an
   unnamed guard's portrait).
-- **Where its batches start** is the kind's `derive`: `words` (its layers alone), `picture`
-  (redraw the parent's picture), or `head` (the head cut from it, `Headshot`). A redraw is image to
-  image: it keeps the picture's pose and composition and changes its surface, so it suits a
-  portrait from the head or a costume in the same stance, and not a new pose. A sprite, a
-  turnaround's back view or an action shot start from words, and the design is held across poses
-  by the entry's look and its LoRA (section 6), which is the loop's point. Redrawing in a new pose
-  from a reference (an edit model, IP-Adapter) is not built; a learned workflow that takes
-  `{{source_image}}` can do it on a server that has the nodes (section 4). A redraw is re-noised
-  by `derive_denoise`, or `chain` in config/comfy.yml. A variant redraws its own subject's picture instead, once it has one: an expression from the
-  neutral portrait. This is the default (`Batch.start!` with `source: :derived`; the studio
-  preselects it, and it can be changed or turned off per batch), so standing orders and the night
-  shift follow it too. Until the parent has a picture, it starts from words. A batch that starts
+- **Where its batches start** is the kind's `derive`:
+  - `words`: its layers alone.
+  - `picture`: redraw the parent's picture; `head`: redraw the head cut from it (`Headshot`). A
+    redraw is image to image: it keeps the picture's pose and composition and changes its
+    surface, so it suits a portrait from the head or a costume in the same stance, not a new pose.
+    It is re-noised by `derive_denoise`, or `chain` in config/comfy.yml.
+  - `reference`: draw from the parent's picture in a new pose (a battle sprite of the
+    character). The picture goes in through IP-Adapter (ComfyUI_IPAdapter_plus:
+    `IPAdapterUnifiedLoader` with the first of `reference.presets` the server has, then
+    `IPAdapter`, its other inputs at the server's defaults), which patches the model, and the
+    sampler starts from an empty latent: the prompt sets the pose, the picture the design. Its
+    weight is `derive_weight`, or `reference.weight` (0.8). Only families with `reference:
+    ipadapter` take it (SDXL and its lineages, SD 1.5); for another family, or a ComfyUI without
+    the nodes, the batch stops saying so. The recipe keeps `source` with `"use": "reference"`, and
+    `reference_weight`.
+
+  A variant starts from its own subject's picture instead, once it has one, the same way: an
+  expression redrawn from the neutral portrait, an attack drawn from the sprite. Across poses the
+  design is also held by the entry's look and, once trained, its LoRA (section 6): the loop's
+  point. A learned workflow taking `{{source_image}}` (section 4) can do what the builder can't.
+  Starting as the kind says is the default (`Batch.start!` with `source: :derived`; the studio
+  preselects it, and it can be changed or turned off per batch, or any pick drawn from as a
+  reference), so standing orders and the night shift follow it too. Until the parent has a picture, it starts from words. A batch that starts
   from a picture has no drafts.
 - **In the studio**, a subject's "Derived from" section lists every kind that can derive from it,
   with what already does; "Make one" (`Subjects::DerivationsController`) adds one named as the

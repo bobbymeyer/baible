@@ -82,7 +82,8 @@ is.
 | `transparent` | boolean | Image only: take the background off. Default `false`. |
 | `seconds` | integer | Audio only, 10–240. Default 60. |
 | `from` | string | The name of the kind this one **derives** from ("Character"). It must be a kind the project has, or one earlier in this array. See "Deriving" below. |
-| `derive` | string | For a derived kind: how its assets start from their parent's picture. `words` (default: words only), `picture` (redraw the parent's picture), or `head` (redraw the head cut from it). A redraw keeps the picture's pose and composition, so use `picture` or `head` only where that is wanted (a portrait from the head, a costume in the same stance); anything in a new pose (a battle sprite, an action shot) should be `words`. |
+| `derive` | string | For a derived kind: how its assets start from their parent's picture. `words` (default: words only), `picture` (redraw the parent's picture), `head` (redraw the head cut from it), or `reference` (draw from the parent's picture in a new pose). A redraw keeps the picture's pose and composition, so use `picture` or `head` only where that is wanted (a portrait from the head, a costume in the same stance). For a new pose (a battle sprite, an action shot) use `reference` on an SDXL or SD 1.5 model with IP-Adapter in ComfyUI, else `words`. |
+| `derive_weight` | number | For `reference`, 0.1–1.5: how closely it holds the parent's design. Leave it out for baible's default (0.8). |
 | `derive_denoise` | number | 0.1–1.0: how far a redraw strays from the picture it starts from. Leave it out for baible's default. |
 | `sheet_of` | array of strings | For a `sheet`: the names of the kinds it lays out. Leave it out for all kinds derived from its `from`. |
 | `variants` | object | Variants every new asset of this kind starts with, `{ "name": "words it adds" }`: a portrait's expressions, a sprite's poses. |
@@ -123,9 +124,10 @@ picked for it.
 
 Kinds can derive from kinds, and assets from assets: a character first, then its portrait, sprite,
 turnaround and costumes, each drawn from the character. A derived asset takes its parent's
-words, LoRAs and entry, and (as its kind says) may start from the parent's picture. A redraw from
-the picture keeps its pose and composition: right for a portrait cut from the head, wrong for a
-new pose. Across poses the design is held by the entry's `look` and, once trained, its LoRA.
+words, LoRAs and entry, and (as its kind says) may start from the parent's picture. A redraw
+(`picture`, `head`) keeps its pose and composition: right for a portrait cut from the head, wrong
+for a new pose. `reference` draws from the picture in a new pose instead (IP-Adapter, on SDXL and
+SD 1.5). The entry's `look` and, once trained, its LoRA hold the design too.
 
 - An asset with `from` must be of a kind that derives from the parent's kind (or from a kind
   derived from that): a Portrait can derive from a Character, or from a Costume derived from that

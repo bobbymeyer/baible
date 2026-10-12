@@ -60,6 +60,10 @@ module Comfy
 
     def label = settings["label"] || slug.humanize
 
+    # How a picture is given to it as a reference, to draw from in a new
+    # pose: "ipadapter", or nil where that isn't built for it.
+    def reference = settings["reference"].presence
+
     # Learned rather than configured (LearnedFamily).
     def learned? = !self.class.config_families.key?(slug)
     def steps = settings.fetch("steps", 25).to_i

@@ -86,7 +86,7 @@ module Skeleton
     row = kind.slice("name", "medium", "prompt", "negative", "width", "height", "transparent", "seconds").compact
     if kind.parent
       row["from"] = kind.parent.name
-      row.merge!(kind.slice("derive", "derive_denoise").compact) unless kind.sheet?
+      row.merge!(kind.slice("derive", "derive_denoise", "derive_weight").compact) unless kind.sheet?
     end
     row["sheet_of"] = kind.sheet_kinds.map(&:name) if kind.sheet? && kind.sheet_kind_ids.any?
     row["variants"] = kind.variant_presets.to_h { |preset| [ preset["name"], preset["prompt"].to_s ] } if kind.variant_presets.any?

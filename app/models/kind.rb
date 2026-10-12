@@ -13,8 +13,9 @@
 # sheets"): a Portrait, a Turnaround or a Battle sprite from a Character.
 # Its subjects then derive from a subject of that kind (Cid's portrait from
 # Cid), whose layer comes before theirs, and `derive` says whether their
-# batches start from words alone or redraw the parent's picture (whole, or
-# its head). A sheet kind makes no pictures of its own: each of its
+# batches start from words alone, redraw the parent's picture (whole, or its
+# head: the same pose), or draw from it as a reference (IP-Adapter: a new
+# pose, the same design). A sheet kind makes no pictures of its own: each of its
 # subjects lays the picks of what derives from its parent out as one
 # picture (Sheet), from the kinds in `sheet_kind_ids` (all of them when
 # empty).
@@ -23,7 +24,8 @@ class Kind < ApplicationRecord
   DERIVE = {
     "words" => "Its words only",
     "picture" => "Redraw its picture",
-    "head" => "Redraw its head"
+    "head" => "Redraw its head",
+    "reference" => "Draw from its picture, in a new pose"
   }.freeze
   SIZES = (256..2048)
   SECONDS = (10..240)
@@ -46,13 +48,14 @@ class Kind < ApplicationRecord
   validates :seconds, numericality: { only_integer: true, in: SECONDS }
   validates :derive, inclusion: { in: DERIVE.keys }
   validates :derive_denoise, numericality: { in: 0.1..1.0 }, allow_nil: true
+  validates :derive_weight, numericality: { in: 0.1..1.5 }, allow_nil: true
   validate :learned_workflow_is_accepted, if: :learned_workflow_id_changed?
   validate :parent_fits
 
   # A row as config/comfy.yml `kinds` and a skeleton write one, as
   # attributes: what it names of these, `variants` ({ name => words }) as
   # presets, and `from` and `sheet_of` by kind name (Project#add_kinds!).
-  ROW_KEYS = %w[name medium prompt negative width height transparent seconds derive derive_denoise from sheet_of].freeze
+  ROW_KEYS = %w[name medium prompt negative width height transparent seconds derive derive_denoise derive_weight from sheet_of].freeze
 
   def self.row_attributes(row)
     row = row.to_h.deep_stringify_keys
@@ -99,15 +102,22 @@ class Kind < ApplicationRecord
     sheet_kind_ids.present? ? kinds.select { |kind| sheet_kind_ids.map(&:to_i).include?(kind.id) } : kinds
   end
 
+  # Drawing from a picture as a reference, at a weight or config's.
+  def self.reference_start(weight = nil)
+    { "crop" => nil, "use" => "reference", "weight" => (weight || Comfy.config.dig(:reference, :weight) || 0.8).to_f }
+  end
+
   def sheet_kind_ids=(value)
     super(Array(value).compact_blank.map(&:to_i).uniq)
   end
 
   # How its subjects' batches start from their parent's picture: nil for
-  # words alone, else { "crop", "denoise" } (config/comfy.yml `chain` when
-  # it names no denoise of its own).
+  # words alone; { "crop", "denoise" } to redraw it (config/comfy.yml
+  # `chain` when it names no denoise of its own); { "crop" => nil, "use" =>
+  # "reference", "weight" } to draw from it (config/comfy.yml `reference`).
   def derived_start
     return if derive == "words" || !image?
+    return self.class.reference_start(derive_weight) if derive == "reference"
 
     chain = Comfy.config.fetch(:chain, {})
     crop = derive == "head" ? "head" : nil

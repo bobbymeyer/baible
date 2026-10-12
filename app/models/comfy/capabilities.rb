@@ -7,11 +7,12 @@
 module Comfy
   class Capabilities
     # The nodes the builder may use, the background-removal node
-    # (ComfyUI-RMBG's, Cutout), ACE-Step's for audio (Comfy::Music), and
+    # (ComfyUI-RMBG's, Cutout), IP-Adapter's for drawing from a reference
+    # (ComfyUI_IPAdapter_plus), ACE-Step's for audio (Comfy::Music), and
     # ComfyUI's own for training a LoRA (Comfy::Training).
     NODES = %W[CheckpointLoaderSimple UNETLoader CLIPLoader VAELoader LoraLoader LoraLoaderModelOnly
                CLIPSetLastLayer CLIPTextEncode ConditioningZeroOut KSampler EmptyLatentImage EmptySD3LatentImage
-               VAEDecode SaveImage LoadImage ImageScale VAEEncode #{Cutout::NODE}
+               VAEDecode SaveImage LoadImage ImageScale VAEEncode #{Cutout::NODE} IPAdapterUnifiedLoader IPAdapter
                EmptyAceStepLatentAudio TextEncodeAceStepAudio ModelSamplingSD3 VAEDecodeAudio SaveAudio SaveAudioMP3
                LoadImageTextDataSetFromFolder MakeTrainingDataset ResolutionBucket TrainLoraNode SaveLoRA].freeze
 

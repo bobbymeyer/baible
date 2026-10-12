@@ -52,6 +52,6 @@ class Projects::KindsController < ApplicationController
 
   def kind_params
     params.expect(kind: [ :name, :medium, :prompt, :negative, :model, :width, :height, :transparent, :seconds, :variant_presets,
-                          :learned_workflow_id, :parent_id, :derive, :derive_denoise, { loras: {} }, { sheet_kind_ids: [] } ])
+                          :learned_workflow_id, :parent_id, :derive, :derive_denoise, :derive_weight, { loras: {} }, { sheet_kind_ids: [] } ])
   end
 end
