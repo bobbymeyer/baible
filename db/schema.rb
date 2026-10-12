@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_11_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_12_010000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
     t.string "record_type", null: false
@@ -104,6 +104,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_11_010000) do
     t.string "derive", default: "words", null: false
     t.float "derive_denoise"
     t.json "sheet_kind_ids", default: [], null: false
+    t.float "derive_weight"
     t.index ["learned_workflow_id"], name: "index_kinds_on_learned_workflow_id"
     t.index ["parent_id"], name: "index_kinds_on_parent_id"
     t.index ["project_id", "name"], name: "index_kinds_on_project_id_and_name", unique: true

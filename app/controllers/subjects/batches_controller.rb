@@ -18,6 +18,7 @@ class Subjects::BatchesController < ApplicationController
     source = chain_source
     options[:source] = source
     options[:denoise] = denoise_for(source) if source.is_a?(Hash) || (source == :derived && params[:denoise].present?)
+    options[:weight] = params[:weight].to_f if params[:weight].present?
 
     if params[:every] == "1" || params[:tonight] == "every"
       raise Refusal, "#{@subject.name} has no variants yet" if @subject.variants.empty?
@@ -52,7 +53,8 @@ class Subjects::BatchesController < ApplicationController
   end
 
   # A pick of this project's to redraw from (images only), with its head
-  # cut out of it when asked (Headshot); "derived": as the subject's kind
+  # cut out of it when asked (Headshot), or to draw from as a reference in a
+  # new pose (use: "reference", IP-Adapter); "derived": as the subject's kind
   # says, from its parent's picture (Subject#derived_source); blank: words
   # alone.
   def chain_source
@@ -61,6 +63,8 @@ class Subjects::BatchesController < ApplicationController
 
     pick = @project.picks.find(params[:from_pick_id])
     raise Refusal, "#{pick.title} has no image to draw from" unless pick.image?
+
+    return Kind.reference_start.merge("pick_id" => pick.id) if params[:use] == "reference"
 
     { "pick_id" => pick.id, "crop" => (params[:crop] == "head" ? "head" : nil) }
   end

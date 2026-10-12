@@ -12,6 +12,10 @@
 # - No negative encode when the sampler would ignore it (cfg 1): the empty
 #   conditioning is made from the positive one instead.
 # - Sampler and scheduler are the family's first preference the server has.
+# - A reference (a pick to draw from in a new pose): the picture goes in
+#   through IP-Adapter, patching the model, and the sampler starts from an
+#   empty latent, so the prompt sets the pose and the picture the design.
+#   Otherwise a source image is a start, encoded and re-noised in part.
 # - Background removal when asked for: the picture as rendered is saved
 #   ("-plain"), then put through the removal node (Cutout.wire) and saved
 #   again, cut out. A ComfyUI without the node can't make it.
@@ -47,6 +51,9 @@ module Comfy
         end
       end
 
+      reference = recipe["source_image"] && recipe.dig("source", "use") == "reference"
+      model = ipadapter(add, model, recipe, family, caps) if reference
+
       clip = [ add.("CLIPSetLastLayer", { "stop_at_clip_layer" => -family.clip_skip, "clip" => clip }), 0 ] if family.clip_skip > 1
 
       positive = [ add.("CLIPTextEncode", { "text" => recipe["positive"].to_s, "clip" => clip }), 0 ]
@@ -61,8 +68,8 @@ module Comfy
       # A draft keeps its small size; anything else is scaled into range.
       width, height = recipe["draft"] ? [ recipe.fetch("width").to_i, recipe.fetch("height").to_i ] : family.size(recipe.fetch("width").to_i, recipe.fetch("height").to_i)
       denoise = 1
-      if recipe["source_image"]
-        # A refinement: the chosen draft, scaled up, encoded, and re-noised in part.
+      if recipe["source_image"] && !reference
+        # A start: the chosen draft or pick, scaled, encoded, and re-noised in part.
         %w[LoadImage ImageScale VAEEncode].each { |node| need.(node) }
         loaded = add.("LoadImage", { "image" => recipe["source_image"] })
         scaled = add.("ImageScale", { "image" => [ loaded, 0 ], "upscale_method" => "lanczos", "width" => width, "height" => height, "crop" => "disabled" })
@@ -89,6 +96,42 @@ module Comfy
 
       add.("SaveImage", { "filename_prefix" => prefix, "images" => image })
       graph
+    end
+
+    # The model, patched by IP-Adapter to draw from the recipe's source
+    # image (the uploaded pick): ComfyUI_IPAdapter_plus's unified loader
+    # (its preset finds the IP-Adapter and CLIP vision models) and its
+    # IPAdapter node, at the recipe's weight. Its other inputs keep the
+    # defaults the server reports, so a newer version of the nodes still fits.
+    def ipadapter(add, model, recipe, family, caps)
+      unless family.reference == "ipadapter"
+        raise Error, "Drawing from a reference is built for SDXL and SD 1.5 models (IP-Adapter), and #{family.label} isn't one: " \
+                     "start from its words instead, or redraw the picture"
+      end
+      %w[IPAdapterUnifiedLoader IPAdapter LoadImage].each do |node|
+        next if caps.node?(node)
+
+        raise Error, "ComfyUI has no #{node} node: install ComfyUI_IPAdapter_plus (by cubiq) in the Manager, with its SDXL models, to draw from a reference"
+      end
+      settings = Comfy.config.fetch(:reference, {}).to_h.stringify_keys
+      preset = caps.prefer(caps.options("IPAdapterUnifiedLoader", "preset"), Array(settings["presets"])) ||
+               caps.options("IPAdapterUnifiedLoader", "preset").first || Array(settings["presets"]).first
+      loader = add.("IPAdapterUnifiedLoader", { "model" => model, "preset" => preset })
+      image = add.("LoadImage", { "image" => recipe["source_image"] })
+      inputs = node_defaults(caps, "IPAdapter").merge(
+        "model" => [ loader, 0 ], "ipadapter" => [ loader, 1 ], "image" => [ image, 0 ],
+        "weight" => (recipe["reference_weight"] || settings["weight"] || 0.8).to_f
+      )
+      [ add.("IPAdapter", inputs), 0 ]
+    end
+
+    # A node's required inputs as the server describes them: each default,
+    # or a choice's first option. Links and inputs without either are left out.
+    def node_defaults(caps, node)
+      caps.defaults(node).filter_map do |input, default|
+        value = default.nil? ? caps.options(node, input).first : default
+        [ input, value ] unless value.nil?
+      end.to_h
     end
 
     # A graph to add nodes to: add.(class_type, inputs) gives the new node's id.

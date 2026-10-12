@@ -126,7 +126,12 @@ batch. HANDOFF "Unknown models and new workflows" has the details.
    everywhere (the bible, the manifest, chains) is its canon pick, else its current one.
 7. **Chains:** a batch can start from any image pick in the project, the whole picture or only the
    head cut from a full-body figure. Sprite, then a portrait from its head, then every expression
-   from the portrait: the same face throughout.
+   from the portrait: the same face throughout. A redraw keeps the picture's pose; for a new pose
+   with the same design (a battle sprite of the character), tick "Draw from it, in a new pose",
+   or set the kind to start that way. That needs an SDXL or SD 1.5 model (Illustrious, Pony too)
+   and ComfyUI_IPAdapter_plus (by cubiq) installed in ComfyUI with its SDXL models (for the PLUS
+   preset, `ip-adapter-plus_sdxl_vit-h.safetensors` in models/ipadapter and the ViT-H CLIP vision
+   model, `CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors`, in models/clip_vision).
 8. **Overnight:** "Queue for tonight" in a studio, or "Train tonight" on a training set, and the
    night shift makes it in the night window (Settings; 23:00 to 07:00 by default), one thing at a
    time while ComfyUI is otherwise idle, generations before training. In the morning the
@@ -194,8 +199,9 @@ assets another project needs, and makes each a placeholder: a subject with nothi
 kind it names, with its variants, its entry, and what it derives from. Give each asset the other
 project's own id as its `ref`: every pick of it carries the ref back in its sidecar, and the project's
 manifest lists each pick's ref and what's still `missing`. Importing again only adds what's new.
-A project's own skeleton (its **Skeleton** page) is a complete example of the format; HANDOFF "Import:
-skeletons" has the details.
+The format, for whoever writes the exporter, is [docs/SKELETON.md](docs/SKELETON.md), with an example
+([docs/skeleton.example.json](docs/skeleton.example.json)); a project's own skeleton (its **Skeleton**
+page) is another.
 
 ## Bringing assets into polychrome
 

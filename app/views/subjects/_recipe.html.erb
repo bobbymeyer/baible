@@ -27,7 +27,9 @@
     <dt>LoRAs</dt><dd><%= lora_stack(Array(recipe["loras"])) %></dd>
     <dt>Model</dt><dd><code><%= model %></code><%= " · #{family.summary}" if family %></dd>
     <dt>Size</dt><dd><%= recipe["width"] %> × <%= recipe["height"] %><% if recipe["transparent"] %><%= ", background removed with #{recipe['cutout'] || 'ComfyUI'}" %><% end %></dd>
-    <% if recipe["source"] %>
+    <% if recipe.dig("source", "use") == "reference" %>
+      <dt>Drawn from</dt><dd><%= recipe.dig("source", "label") %>, as a reference (IP-Adapter), weight <%= recipe["reference_weight"] %></dd>
+    <% elsif recipe["source"] %>
       <dt>Started from</dt><dd><%= recipe.dig("source", "crop") == "head" ? "the head of " : "" %><%= recipe.dig("source", "label") %>, re-noised <%= recipe["denoise"] %></dd>
     <% end %>
   <% end %>

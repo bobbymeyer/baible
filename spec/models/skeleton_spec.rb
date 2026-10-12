@@ -91,6 +91,16 @@ RSpec.describe Skeleton do
     expect { described_class.import!(JSON.generate("baible_skeleton" => 1)) }.to raise_error(Skeleton::Invalid, /project/)
   end
 
+  it "imports the example in docs/SKELETON.md as it says" do
+    report = described_class.import!(Rails.root.join("docs/skeleton.example.json").read)
+    project = report.project
+    expect(report.summary).to eq("Made The Drowned Coast; 1 new kind (Battle sprite); 1 new entry; 7 new placeholders; 1 new variant.")
+    cid = project.subjects.find_by!(ref: "speaker/12")
+    expect(project.subjects.where(parent: cid).pluck(:ref)).to contain_exactly("speaker/12/portrait", "speaker/12/battle", "speaker/12/winter")
+    expect(project.subjects.find_by!(ref: "speaker/12/battle").variants.find_by!(name: "attack")).to have_attributes(ref: "speaker/12/battle/attack", prompt: "lunging forward, weapon raised")
+    expect(project.subjects.find_by!(ref: "music/harbour")).to have_attributes(seconds: 90, medium: "audio")
+  end
+
   it "exports a project as a skeleton that makes the same placeholders elsewhere" do
     project = described_class.import!(skeleton).project
     exported = described_class.export(project)

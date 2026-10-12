@@ -128,14 +128,16 @@ class Subject < ApplicationRecord
   def image_family = Comfy::Family.for(model_file, capabilities: -> { Comfy.capabilities })
 
   # Where a batch for it starts when nobody chose (docs/HANDOFF.md "Derived
-  # kinds and sheets"), as Batch.start!'s source with its denoise: a
-  # variant redraws the subject's own picture, once it has one; the
-  # subject redraws its parent's (or its head), as its kind says. nil:
-  # from words alone.
+  # kinds and sheets"), as Batch.start!'s source with its denoise (or, to
+  # draw from it as a reference, its weight): a variant starts from the
+  # subject's own picture, once it has one; the subject from its parent's
+  # (or its head), as its kind says. nil: from words alone.
   def derived_source(variant = nil)
     start = kind.derived_start or return
     own = pick_for(nil) if variant
     if own&.image?
+      return start.merge("pick_id" => own.id) if start["use"] == "reference" # a new pose of its own design
+
       return { "pick_id" => own.id, "crop" => nil, "denoise" => Comfy.config.fetch(:chain, {}).fetch(:denoise, 0.45) }
     end
 

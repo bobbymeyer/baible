@@ -130,7 +130,7 @@ class Pick < ApplicationRecord
       "transparent" => recipe["transparent"],
       "lyrics" => recipe["lyrics"].presence,
       "seconds" => recipe["seconds"],
-      "source" => recipe["source"]&.slice("label", "crop")&.merge("denoise" => recipe["denoise"]),
+      "source" => source_for_sidecar,
       "workflow" => recipe["workflow"],
       "run_seconds" => run_seconds,
       "picked_at" => created_at&.utc&.iso8601,
@@ -139,6 +139,15 @@ class Pick < ApplicationRecord
   end
 
   private
+
+  # Where it started: { "label", "crop"?, "denoise" } for a redraw, or
+  # { "label", "use": "reference", "weight" } for a picture drawn from.
+  def source_for_sidecar
+    source = recipe["source"] or return
+    return source.slice("label", "use").merge("weight" => recipe["reference_weight"]) if source["use"] == "reference"
+
+    source.slice("label", "crop").merge("denoise" => recipe["denoise"])
+  end
 
   def variant_is_the_subjects
     errors.add(:variant, "must be the subject's own") if variant && variant.subject_id != subject_id

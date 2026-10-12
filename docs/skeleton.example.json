@@ -1,0 +1,46 @@
+{
+  "baible_skeleton": 1,
+  "source": "polychrome",
+  "project": {
+    "name": "The Drowned Coast",
+    "description": "A drowned harbour town and the sea that took it.",
+    "style": "ink wash, muted sea colours",
+    "negative": "text, watermark",
+    "sound": "sea shanty, accordion, slow"
+  },
+  "kinds": [
+    {
+      "name": "Battle sprite",
+      "medium": "image",
+      "from": "Character",
+      "derive": "words",
+      "prompt": "a single figure in a battle stance, full body, facing right, plain white background",
+      "negative": "multiple people, cropped, text",
+      "width": 832,
+      "height": 1216,
+      "transparent": true,
+      "variants": { "attack": "lunging forward, weapon raised", "hurt": "staggering back, wincing" }
+    }
+  ],
+  "entries": [
+    { "name": "Cid", "look": "white beard, eyepatch over the left eye, red coat", "lore": "The harbourmaster, who stayed when the water came." }
+  ],
+  "assets": [
+    { "ref": "speaker/12", "kind": "Character", "name": "Cid", "entry": "Cid", "notes": "brass buttons, a lantern at his belt" },
+    {
+      "ref": "speaker/12/portrait", "kind": "Portrait", "name": "Cid", "from": "speaker/12",
+      "variants": [
+        { "name": "happy", "ref": "speaker/12/portrait/happy" },
+        { "name": "smug", "prompt": "a smug grin", "ref": "speaker/12/portrait/smug" }
+      ]
+    },
+    {
+      "ref": "speaker/12/battle", "kind": "Battle sprite", "name": "Cid", "from": "speaker/12",
+      "variants": [ { "name": "attack", "ref": "speaker/12/battle/attack" } ]
+    },
+    { "ref": "speaker/12/winter", "kind": "Costume", "name": "Cid, winter coat", "from": "speaker/12", "notes": "a heavy fur-lined coat" },
+    { "ref": "bestiary/3", "kind": "Creature", "name": "Drowned sailor", "notes": "barnacled, a broken lantern" },
+    { "ref": "places/harbour", "kind": "Location", "name": "The harbour at low tide" },
+    { "ref": "music/harbour", "kind": "Music", "name": "The harbour's theme", "notes": "slow, swaying, accordion", "seconds": 90 }
+  ]
+}

@@ -66,13 +66,19 @@
         <%= f.select :derive, Kind::DERIVE.invert %>
       </div>
       <div class="field">
-        <%= f.label :derive_denoise, "Re-noise" %>
+        <%= f.label :derive_denoise, "Re-noise (a redraw)" %>
         <%= f.number_field :derive_denoise, min: 0.1, max: 1, step: 0.05, placeholder: Comfy.config.fetch(:chain, {})[:denoise].to_s %>
+      </div>
+      <div class="field">
+        <%= f.label :derive_weight, "Weight (drawn from)" %>
+        <%= f.number_field :derive_weight, min: 0.1, max: 1.5, step: 0.05, placeholder: Kind.reference_start["weight"].to_s %>
       </div>
     </div>
     <p class="hint">
-      For a derived kind: its parent subject's words alone, or redrawing its picture (or the head cut from it, for a portrait from a full figure), once
-      it has one; the studio can choose otherwise. A variant redraws its own subject's picture. Blank re-noise is
+      For a derived kind: its parent subject's words alone; redrawing its picture (or the head cut from it, for a portrait from a full figure),
+      which keeps its pose; or drawing from its picture in a new pose (a battle sprite of the character), which needs an SDXL or SD 1.5 model and
+      IP-Adapter in ComfyUI (ComfyUI_IPAdapter_plus). Once the parent has a picture; the studio can choose otherwise. A variant starts from its own
+      subject's picture the same way. A higher weight holds the design closer and leaves the prompt less room. Blank re-noise is
       <%= Comfy.config.fetch(:chain, {})[:head_denoise] %> for a head, <%= Comfy.config.fetch(:chain, {})[:denoise] %> otherwise.
     </p>
     <%= render "shared/model_field", name: "kind[model]", id: "kind_model", value: kind.model, inherited: project.model.presence || Comfy.config[:model] %>

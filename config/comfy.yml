@@ -102,6 +102,16 @@ shared: &shared
   chain:
     head_denoise: 0.55
     denoise: 0.45
+  # Drawing from a pick as a reference, in a new pose (Batch source "use":
+  # "reference", a derived kind's derive "reference"): the picture goes in
+  # through IP-Adapter (ComfyUI_IPAdapter_plus, by cubiq, in the Manager,
+  # with its models), and the prompt draws on an empty canvas. Only the
+  # families with `reference: ipadapter` take it (SDXL and its lineages, SD
+  # 1.5). weight: how strongly it holds the design; presets: the
+  # IPAdapterUnifiedLoader preset, the first one the server has.
+  reference:
+    weight: 0.8
+    presets: ["PLUS (high strength)", "STANDARD (medium strength)"]
   # Taking the background off (Cutout), for the kinds marked transparent
   # and any batch asked to: in ComfyUI, with ComfyUI-RMBG's
   # BiRefNet node (install "ComfyUI-RMBG" by 1038lab from the Manager). It
@@ -189,6 +199,7 @@ shared: &shared
     sd15:
       label: SD 1.5
       match: [sd15, sd_15, v1-5, sd-1.5, sd1.5]
+      reference: ipadapter
       lora: model_and_clip
       steps: 25
       cfg: 7.0
@@ -201,6 +212,7 @@ shared: &shared
       label: SDXL
       match: [sdxl, _xl, xl_, -xl, xl-, pony, illustrious, noob, juggernaut, realvis]
       vae_override: [sdxl-vae-fp16-fix, sdxl_vae_fp16_fix]
+      reference: ipadapter
       lora: model_and_clip
       steps: 25
       cfg: 6.0
@@ -263,10 +275,12 @@ shared: &shared
       width: 832
       height: 1216
       transparent: false
+    # From words, not the character's picture: a redraw keeps the picture's
+    # pose and composition, and a sprite needs its own. The entry's look,
+    # and its LoRA once trained, hold the design.
     - name: Character sprite
       from: Character
-      derive: picture
-      derive_denoise: 0.6
+      derive: words
       medium: image
       prompt: "a single figure, full body, standing, facing the viewer, centered, plain white background"
       negative: "multiple people, cropped, text"

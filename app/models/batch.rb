@@ -36,10 +36,11 @@ class Batch < ApplicationRecord
   # choose one), and replaces nothing, as nothing replaces it but a pick.
   # A derived subject starts from its parent's picture when its kind says
   # so (source: :derived, the default; Subject#derived_source); nil starts
-  # from words alone. A sheet is laid out at once, from the picks as they
-  # are (Sheet): one candidate, no ComfyUI.
+  # from words alone. A source with "use" => "reference" is drawn from in a
+  # new pose (IP-Adapter, at weight) rather than redrawn. A sheet is laid
+  # out at once, from the picks as they are (Sheet): one candidate, no ComfyUI.
   def self.start!(subject, variant: nil, count: Comfy.config[:candidates], write: true, transparent: nil, draft: false,
-                  source: :derived, denoise: nil, tonight: false)
+                  source: :derived, denoise: nil, weight: nil, tonight: false)
     return start_sheet!(subject) if subject.sheet?
 
     draft = false if tonight
@@ -49,6 +50,8 @@ class Batch < ApplicationRecord
       source = subject.derived_source(variant)&.dup
       denoise ||= source&.delete("denoise")
     end
+    reference = source && source["use"] == "reference"
+    source = source.merge("weight" => weight) if reference && weight
 
     count = count.to_i.clamp(1, 8)
     base = Random.rand(2**31)
@@ -70,7 +73,11 @@ class Batch < ApplicationRecord
           recipe["transparent"] = false
           from = nil unless Comfy::Template.placeholders(recipe.dig("learned_workflow", "graph")).include?("{{source_image}}")
         end
-        if from
+        if from && reference
+          # Drawn from as a reference (IP-Adapter): a new pose, from an empty canvas.
+          recipe = recipe.merge("source" => { "pick_id" => from.id, "use" => "reference", "label" => from.title },
+                                "reference_weight" => (source["weight"] || Kind.reference_start["weight"]).to_f.clamp(0.1, 1.5))
+        elsif from
           recipe = recipe.merge("source" => { "pick_id" => from.id, "crop" => source["crop"].presence, "label" => from.title }.compact,
                                 "denoise" => denoise.to_f.clamp(0.1, 1.0))
         end
@@ -197,6 +204,8 @@ class Batch < ApplicationRecord
   # Where a chain step starts from, for the strip ("from Cid's head").
   def source_label
     source = recipe["source"] or return
+    return "drawn from #{source['label']}, in a new pose" if source["use"] == "reference"
+
     source["crop"] == "head" ? "from the head of #{source['label']}" : "from #{source['label']}"
   end
 

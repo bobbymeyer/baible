@@ -37,7 +37,7 @@
     <h2><span class="medium medium--<%= kind.medium %>" title="<%= kind.medium.humanize %>"></span><%= kind.name %></h2>
     <dl class="facts">
       <% if kind.parent %>
-        <dt>From</dt><dd><%= kind.parent.name %><%= ": #{Kind::DERIVE.fetch(kind.derive).downcase}" if kind.image? %><%= ", re-noised #{kind.derive_denoise}" if kind.image? && kind.derive_denoise && kind.derive != "words" %></dd>
+        <dt>From</dt><dd><%= kind.parent.name %><%= ": #{Kind::DERIVE.fetch(kind.derive).downcase}" if kind.image? %><%= ", re-noised #{kind.derive_denoise}" if kind.image? && kind.derive_denoise && kind.derive.in?(%w[picture head]) %><%= ", weight #{kind.derive_weight}" if kind.image? && kind.derive_weight && kind.derive == "reference" %></dd>
       <% end %>
       <% if kind.derived_kinds.any? %>
         <dt>Derived</dt><dd><%= kind.derived_kinds.map(&:name).to_sentence %></dd>
