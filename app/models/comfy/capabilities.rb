@@ -13,6 +13,7 @@ module Comfy
     NODES = %W[CheckpointLoaderSimple UNETLoader CLIPLoader VAELoader LoraLoader LoraLoaderModelOnly
                CLIPSetLastLayer CLIPTextEncode ConditioningZeroOut KSampler EmptyLatentImage EmptySD3LatentImage
                VAEDecode SaveImage LoadImage ImageScale VAEEncode #{Cutout::NODE} IPAdapterUnifiedLoader IPAdapter
+               IPAdapterModelLoader CLIPVisionLoader IPAdapterAdvanced
                EmptyAceStepLatentAudio TextEncodeAceStepAudio ModelSamplingSD3 VAEDecodeAudio SaveAudio SaveAudioMP3
                LoadImageTextDataSetFromFolder MakeTrainingDataset ResolutionBucket TrainLoraNode SaveLoRA].freeze
 
@@ -60,6 +61,8 @@ module Comfy
     def clip_types = options("CLIPLoader", "type")
     def vaes = options("VAELoader", "vae_name")
     def loras = options("LoraLoader", "lora_name").presence || options("LoraLoaderModelOnly", "lora_name")
+    def ipadapters = options("IPAdapterModelLoader", "ipadapter_file")
+    def clip_visions = options("CLIPVisionLoader", "clip_name")
     def samplers = options("KSampler", "sampler_name")
     def schedulers = options("KSampler", "scheduler")
 

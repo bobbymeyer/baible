@@ -131,7 +131,11 @@ batch. HANDOFF "Unknown models and new workflows" has the details.
    or set the kind to start that way. That needs an SDXL or SD 1.5 model (Illustrious, Pony too)
    and ComfyUI_IPAdapter_plus (by cubiq) installed in ComfyUI with its SDXL models (for the PLUS
    preset, `ip-adapter-plus_sdxl_vit-h.safetensors` in models/ipadapter and the ViT-H CLIP vision
-   model, `CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors`, in models/clip_vision).
+   model, `CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors`, in models/clip_vision). On Illustrious
+   (and NoobAI), an IP-Adapter trained on that lineage is used instead when it's there: put it in
+   models/ipadapter (NoobAI's `noobIPAMARK1_mark1.safetensors`, say) with the CLIP vision model its
+   card names in models/clip_vision (ViT-bigG for that one). Which file names count is the
+   Illustrious family's `ipadapter` and `clip_vision` in config/comfy.yml.
 8. **Overnight:** "Queue for tonight" in a studio, or "Train tonight" on a training set, and the
    night shift makes it in the night window (Settings; 23:00 to 07:00 by default), one thing at a
    time while ComfyUI is otherwise idle, generations before training. In the morning the

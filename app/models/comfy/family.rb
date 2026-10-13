@@ -64,6 +64,16 @@ module Comfy
     # pose: "ipadapter", or nil where that isn't built for it.
     def reference = settings["reference"].presence
 
+    # An IP-Adapter trained on it, and the CLIP vision model that goes with
+    # it, as file name fragments: used instead of the unified loader's
+    # presets when the server has both (Illustrious).
+    def ipadapter_files = Array(settings["ipadapter"])
+
+    # How IP-Adapter weighs the picture across layers, in preference order
+    # (SDXL: its design without its composition); empty for the node's default.
+    def reference_weight_types = Array(settings["reference_weight_types"])
+    def clip_visions = Array(settings["clip_vision"])
+
     # Learned rather than configured (LearnedFamily).
     def learned? = !self.class.config_families.key?(slug)
     def steps = settings.fetch("steps", 25).to_i

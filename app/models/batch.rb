@@ -39,15 +39,17 @@ class Batch < ApplicationRecord
   # from words alone. A source with "use" => "reference" is drawn from in a
   # new pose (IP-Adapter, at weight) rather than redrawn. A sheet is laid
   # out at once, from the picks as they are (Sheet): one candidate, no ComfyUI.
+  # as_reference: with source :derived, draw from the picture the subject
+  # derives from (Subject#reference_source) whatever its kind says.
   def self.start!(subject, variant: nil, count: Comfy.config[:candidates], write: true, transparent: nil, draft: false,
-                  source: :derived, denoise: nil, weight: nil, tonight: false)
+                  source: :derived, denoise: nil, weight: nil, as_reference: false, tonight: false)
     return start_sheet!(subject) if subject.sheet?
 
     draft = false if tonight
     raise ArgumentError, "That variant is another subject's" if variant && variant.subject_id != subject.id
 
     if source == :derived
-      source = subject.derived_source(variant)&.dup
+      source = (as_reference ? subject.reference_source(variant) : subject.derived_source(variant))&.dup
       denoise ||= source&.delete("denoise")
     end
     reference = source && source["use"] == "reference"
@@ -58,7 +60,9 @@ class Batch < ApplicationRecord
     seeds = Array.new(count) { |i| (base + i) % 2**31 }
     from = source && Pick.find(source["pick_id"])
     draft = false if from # a redrawing is made properly at once
-    hint = from ? from.seed : subject.seed_hint(variant)
+    # A redraw keeps its picture's seed, so the face holds; drawing from a
+    # reference doesn't, or the same noise brings back the same pose.
+    hint = from ? from.seed : subject.seed_hint(variant) unless reference
     seeds[0] = hint if hint
     batch = transaction do
       subject.batches.where(variant: variant, night: false).destroy_all unless tonight

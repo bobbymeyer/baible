@@ -127,6 +127,14 @@ class Subject < ApplicationRecord
 
   def image_family = Comfy::Family.for(model_file, capabilities: -> { Comfy.capabilities })
 
+  # The picture to draw from in a new pose, whatever its kind says: a
+  # variant's subject's own pick, once it has one, else its parent's; as
+  # Batch.start!'s source with the kind's weight. nil when there's none.
+  def reference_source(variant = nil)
+    pick = (pick_for(nil) if variant) || parent&.pick_for(nil)
+    Kind.reference_start(kind.derive_weight).merge("pick_id" => pick.id) if pick&.image?
+  end
+
   # Where a batch for it starts when nobody chose (docs/HANDOFF.md "Derived
   # kinds and sheets"), as Batch.start!'s source with its denoise (or, to
   # draw from it as a reference, its weight): a variant starts from the
