@@ -104,9 +104,9 @@
         <p class="hint">
           Lower keeps more of the picture. “Only the head” cuts it square from a full-body figure (a sprite to a portrait);
           blank re-noise is <%= Comfy.config.fetch(:chain, {})[:head_denoise] %> for a head, <%= Comfy.config.fetch(:chain, {})[:denoise] %> otherwise<%= ", and #{subject.kind.name}'s own when it starts as its kind says (the head too, if so)" if start %>.
-          The first candidate takes the pick's seed, so the face holds. “Draw from it” keeps the design but not the pose: the picture goes in
-          as a reference (IP-Adapter: SDXL and SD 1.5 models, with ComfyUI_IPAdapter_plus installed) and the prompt draws on an empty canvas;
-          weight is how closely it holds the design.
+          A redraw's first candidate takes the pick's seed, so the face holds. “Draw from it” keeps the design but not the pose: the picture goes
+          in as a reference (IP-Adapter: SDXL and SD 1.5 models, with ComfyUI_IPAdapter_plus installed), the prompt draws on an empty canvas,
+          and it works with the start chosen above too; weight is how closely it holds the design. Say the pose in the notes.
         </p>
       <% end %>
     </fieldset>

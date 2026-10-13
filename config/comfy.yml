@@ -110,7 +110,12 @@ shared: &shared
   # 1.5). weight: how strongly it holds the design; presets: the
   # IPAdapterUnifiedLoader preset, the first one the server has. A family
   # can name an IP-Adapter of its own instead (`ipadapter`, `clip_vision`:
-  # Illustrious), loaded by file when the server has it.
+  # Illustrious), loaded by file when the server has it. weight_types: how
+  # the picture is weighted across the model's layers, the first the server
+  # offers (a family's `reference_weight_types` first): IP-Adapter's
+  # default carries the picture's composition, and with it its pose, while
+  # "strong style transfer" (SDXL) carries its design and leaves the pose to
+  # the prompt.
   reference:
     weight: 0.8
     presets: ["PLUS (high strength)", "STANDARD (medium strength)"]
@@ -215,6 +220,7 @@ shared: &shared
       match: [sdxl, _xl, xl_, -xl, xl-, pony, illustrious, noob, juggernaut, realvis]
       vae_override: [sdxl-vae-fp16-fix, sdxl_vae_fp16_fix]
       reference: ipadapter
+      reference_weight_types: [strong style transfer, style transfer]
       lora: model_and_clip
       steps: 25
       cfg: 6.0

@@ -117,25 +117,36 @@ module Comfy
         ipadapter, clip_vision = own
         image = add.("LoadImage", { "image" => recipe["source_image"] })
         inputs = node_defaults(caps, "IPAdapterAdvanced").merge(
-          "model" => model, "ipadapter" => [ ipadapter, 0 ], "clip_vision" => [ clip_vision, 0 ], "image" => [ image, 0 ], "weight" => weight
+          "model" => model, "ipadapter" => [ ipadapter, 0 ], "clip_vision" => [ clip_vision, 0 ], "image" => [ image, 0 ],
+          "weight" => weight, **weight_type(caps, "IPAdapterAdvanced", family)
         )
         return [ add.("IPAdapterAdvanced", inputs), 0 ]
       end
 
-      %w[IPAdapterUnifiedLoader IPAdapter LoadImage].each do |node|
+      %w[IPAdapterUnifiedLoader LoadImage].each do |node|
         next if caps.node?(node)
 
         raise Error, "ComfyUI has no #{node} node: install ComfyUI_IPAdapter_plus (by cubiq) in the Manager, with its SDXL models, to draw from a reference"
       end
+      # IPAdapterAdvanced where the server has it (more weight types), else IPAdapter.
+      apply = %w[IPAdapterAdvanced IPAdapter].find { |node| caps.node?(node) } or
+        raise Error, "ComfyUI has no IPAdapter node: install ComfyUI_IPAdapter_plus (by cubiq) in the Manager, with its SDXL models, to draw from a reference"
       preset = caps.prefer(caps.options("IPAdapterUnifiedLoader", "preset"), Array(settings["presets"])) ||
                caps.options("IPAdapterUnifiedLoader", "preset").first || Array(settings["presets"]).first
       loader = add.("IPAdapterUnifiedLoader", { "model" => model, "preset" => preset })
       image = add.("LoadImage", { "image" => recipe["source_image"] })
-      inputs = node_defaults(caps, "IPAdapter").merge(
+      inputs = node_defaults(caps, apply).merge(
         "model" => [ loader, 0 ], "ipadapter" => [ loader, 1 ], "image" => [ image, 0 ],
-        "weight" => weight
+        "weight" => weight, **weight_type(caps, apply, family)
       )
-      [ add.("IPAdapter", inputs), 0 ]
+      [ add.(apply, inputs), 0 ]
+    end
+
+    # { "weight_type" => the family's first preference the node offers }, or
+    # {} to keep the node's default.
+    def weight_type(caps, node, family)
+      choice = caps.prefer(caps.options(node, "weight_type"), family.reference_weight_types)
+      choice ? { "weight_type" => choice } : {}
     end
 
     # The family's own IP-Adapter and CLIP vision model, loaded by file, as

@@ -19,6 +19,7 @@ class Subjects::BatchesController < ApplicationController
     options[:source] = source
     options[:denoise] = denoise_for(source) if source.is_a?(Hash) || (source == :derived && params[:denoise].present?)
     options[:weight] = params[:weight].to_f if params[:weight].present?
+    options[:as_reference] = true if source == :derived && params[:use] == "reference"
 
     if params[:every] == "1" || params[:tonight] == "every"
       raise Refusal, "#{@subject.name} has no variants yet" if @subject.variants.empty?
