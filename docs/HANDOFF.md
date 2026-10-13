@@ -296,8 +296,11 @@ knows kinds that derive from kinds, subjects that derive from subjects, and shee
     sampler starts from an empty latent: the prompt sets the pose, the picture the design. Its
     weight is `derive_weight`, or `reference.weight` (0.8). Only families with `reference:
     ipadapter` take it (SDXL and its lineages, SD 1.5); for another family, or a ComfyUI without
-    the nodes, the batch stops saying so. The recipe keeps `source` with `"use": "reference"`, and
-    `reference_weight`.
+    the nodes, the batch stops saying so. A family can name an IP-Adapter trained on it (`ipadapter`
+    and `clip_vision`, file name fragments: Illustrious names NoobAI's): when the server has both
+    files, they are loaded by file (`IPAdapterModelLoader`, `CLIPVisionLoader`) into
+    `IPAdapterAdvanced` instead, and otherwise the unified loader's preset is used. The recipe
+    keeps `source` with `"use": "reference"`, and `reference_weight`.
 
   A variant starts from its own subject's picture instead, once it has one, the same way: an
   expression redrawn from the neutral portrait, an attack drawn from the sprite. Across poses the

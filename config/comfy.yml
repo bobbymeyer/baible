@@ -108,7 +108,9 @@ shared: &shared
   # with its models), and the prompt draws on an empty canvas. Only the
   # families with `reference: ipadapter` take it (SDXL and its lineages, SD
   # 1.5). weight: how strongly it holds the design; presets: the
-  # IPAdapterUnifiedLoader preset, the first one the server has.
+  # IPAdapterUnifiedLoader preset, the first one the server has. A family
+  # can name an IP-Adapter of its own instead (`ipadapter`, `clip_vision`:
+  # Illustrious), loaded by file when the server has it.
   reference:
     weight: 0.8
     presets: ["PLUS (high strength)", "STANDARD (medium strength)"]
@@ -245,6 +247,13 @@ shared: &shared
           negative_prefix: "worst quality, low quality"
           prompt_style: tags
           clip_skip: 2
+          # An IP-Adapter trained on this lineage, used instead of the
+          # unified loader's SDXL presets when one is in models/ipadapter
+          # (file names containing these), with the CLIP vision model it
+          # was trained with in models/clip_vision. Check the model's card
+          # for which: a wrong pairing fails in ComfyUI.
+          ipadapter: [noobipa, noob_ipa, noob-ipa, illustrious_ipa, ipa_illustrious, illustrious-ipa]
+          clip_vision: [vit-bigg, vit_bigg, bigg, vit-g, vit_g]
         - match: [lightning, turbo, lcm, hyper, dmd]
           training_note: "Distilled for speed: a LoRA trained on it works poorly. Train on a full SDXL model of the same lineage."
           steps: 6

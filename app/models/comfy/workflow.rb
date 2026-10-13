@@ -99,30 +99,55 @@ module Comfy
     end
 
     # The model, patched by IP-Adapter to draw from the recipe's source
-    # image (the uploaded pick): ComfyUI_IPAdapter_plus's unified loader
-    # (its preset finds the IP-Adapter and CLIP vision models) and its
-    # IPAdapter node, at the recipe's weight. Its other inputs keep the
+    # image (the uploaded pick), at the recipe's weight: the family's own
+    # IP-Adapter and CLIP vision files when the server has both
+    # (IPAdapterModelLoader, CLIPVisionLoader, IPAdapterAdvanced: an
+    # Illustrious one), else ComfyUI_IPAdapter_plus's unified loader, whose
+    # preset finds the models, and its IPAdapter node. Other inputs keep the
     # defaults the server reports, so a newer version of the nodes still fits.
     def ipadapter(add, model, recipe, family, caps)
       unless family.reference == "ipadapter"
         raise Error, "Drawing from a reference is built for SDXL and SD 1.5 models (IP-Adapter), and #{family.label} isn't one: " \
                      "start from its words instead, or redraw the picture"
       end
+      settings = Comfy.config.fetch(:reference, {}).to_h.stringify_keys
+      weight = (recipe["reference_weight"] || settings["weight"] || 0.8).to_f
+      own = family_ipadapter(add, family, caps)
+      if own
+        ipadapter, clip_vision = own
+        image = add.("LoadImage", { "image" => recipe["source_image"] })
+        inputs = node_defaults(caps, "IPAdapterAdvanced").merge(
+          "model" => model, "ipadapter" => [ ipadapter, 0 ], "clip_vision" => [ clip_vision, 0 ], "image" => [ image, 0 ], "weight" => weight
+        )
+        return [ add.("IPAdapterAdvanced", inputs), 0 ]
+      end
+
       %w[IPAdapterUnifiedLoader IPAdapter LoadImage].each do |node|
         next if caps.node?(node)
 
         raise Error, "ComfyUI has no #{node} node: install ComfyUI_IPAdapter_plus (by cubiq) in the Manager, with its SDXL models, to draw from a reference"
       end
-      settings = Comfy.config.fetch(:reference, {}).to_h.stringify_keys
       preset = caps.prefer(caps.options("IPAdapterUnifiedLoader", "preset"), Array(settings["presets"])) ||
                caps.options("IPAdapterUnifiedLoader", "preset").first || Array(settings["presets"]).first
       loader = add.("IPAdapterUnifiedLoader", { "model" => model, "preset" => preset })
       image = add.("LoadImage", { "image" => recipe["source_image"] })
       inputs = node_defaults(caps, "IPAdapter").merge(
         "model" => [ loader, 0 ], "ipadapter" => [ loader, 1 ], "image" => [ image, 0 ],
-        "weight" => (recipe["reference_weight"] || settings["weight"] || 0.8).to_f
+        "weight" => weight
       )
       [ add.("IPAdapter", inputs), 0 ]
+    end
+
+    # The family's own IP-Adapter and CLIP vision model, loaded by file, as
+    # [ipadapter node, clip vision node]; nil when it names none or the
+    # server lacks the files or the nodes (the unified loader is used).
+    def family_ipadapter(add, family, caps)
+      return if family.ipadapter_files.empty?
+      return unless %w[IPAdapterModelLoader CLIPVisionLoader IPAdapterAdvanced LoadImage].all? { |node| caps.node?(node) }
+
+      file = caps.find_like(caps.ipadapters, family.ipadapter_files) or return
+      vision = caps.find_like(caps.clip_visions, family.clip_visions) or return
+      [ add.("IPAdapterModelLoader", { "ipadapter_file" => file }), add.("CLIPVisionLoader", { "clip_name" => vision }) ]
     end
 
     # A node's required inputs as the server describes them: each default,

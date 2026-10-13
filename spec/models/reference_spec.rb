@@ -65,6 +65,41 @@ RSpec.describe "Drawing from a reference" do
     expect(pick.sidecar["source"]).to eq("label" => "Cid", "use" => "reference", "weight" => 0.7)
   end
 
+  it "uses an Illustrious IP-Adapter by file when the server has one, and the unified loader when it hasn't" do
+    pick!(cid)
+    sprite = make_subject(project, "Battle sprite", "Cid", parent: cid)
+    files = {
+      "IPAdapterModelLoader" => { "input" => { "required" => { "ipadapter_file" => [ [ "ip-adapter-plus_sdxl_vit-h.safetensors", "noobIPAMARK1_mark1.safetensors" ] ] } } },
+      "CLIPVisionLoader" => { "input" => { "required" => { "clip_name" => [ [ "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors", "CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors" ] ] } } },
+      "IPAdapterAdvanced" => { "input" => {
+        "required" => { "model" => [ "MODEL" ], "ipadapter" => [ "IPADAPTER" ], "image" => [ "IMAGE" ], "weight" => [ "FLOAT", { "default" => 1.0 } ],
+                        "weight_type" => [ [ "linear", "ease in" ] ], "combine_embeds" => [ [ "concat", "add" ] ],
+                        "start_at" => [ "FLOAT", { "default" => 0.0 } ], "end_at" => [ "FLOAT", { "default" => 1.0 } ],
+                        "embeds_scaling" => [ [ "V only", "K+V" ] ] },
+        "optional" => { "clip_vision" => [ "CLIP_VISION" ] }
+      } }
+    }
+    illustrious = FakeComfy.new(capabilities: FakeComfy.capabilities(checkpoints: [ "waiIllustriousSDXL_v150.safetensors" ], extra: ipadapter_info.merge(files)))
+    batch = Batch.start!(sprite, count: 1)
+    BatchJob.new.perform(batch, client: illustrious)
+    graph = illustrious.submitted.last
+    nodes = graph.transform_values { |node| node["class_type"] }.invert
+    expect(graph[nodes["IPAdapterModelLoader"]]["inputs"]).to eq("ipadapter_file" => "noobIPAMARK1_mark1.safetensors")
+    expect(graph[nodes["CLIPVisionLoader"]]["inputs"]).to eq("clip_name" => "CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors")
+    expect(graph[nodes["IPAdapterAdvanced"]]["inputs"]).to include(
+      "weight" => 0.7, "weight_type" => "linear", "combine_embeds" => "concat", "embeds_scaling" => "V only",
+      "ipadapter" => [ nodes["IPAdapterModelLoader"], 0 ], "clip_vision" => [ nodes["CLIPVisionLoader"], 0 ]
+    )
+    expect(nodes).not_to have_key("IPAdapterUnifiedLoader")
+
+    # A plain SDXL model, or no Illustrious file: the unified loader's preset.
+    plain = FakeComfy.new(capabilities: FakeComfy.capabilities(checkpoints: [ "waiIllustriousSDXL_v150.safetensors" ],
+                                                               extra: ipadapter_info.merge(files.merge("IPAdapterModelLoader" => { "input" => { "required" => { "ipadapter_file" => [ [ "ip-adapter-plus_sdxl_vit-h.safetensors" ] ] } } }))))
+    batch = Batch.start!(sprite, count: 1)
+    BatchJob.new.perform(batch, client: plain)
+    expect(plain.submitted.last.values.map { |node| node["class_type"] }).to include("IPAdapterUnifiedLoader", "IPAdapter")
+  end
+
   it "draws a variant from its own subject's picture, in its pose" do
     sprite = make_subject(project, "Battle sprite", "Cid", parent: cid)
     attack = sprite.variants.create!(name: "attack", prompt: "lunging forward")
